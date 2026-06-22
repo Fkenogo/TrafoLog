@@ -1,0 +1,169 @@
+openapi: 3.0.0
+info:
+  title: kVAssetTracker API
+  version: 1.0.0
+  description: Transformer Asset Management Platform API
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.kVAssetTracker.com/api
+    description: Production server
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Transformers
+    description: Transformer management
+  - name: Inspections
+    description: Inspection logging
+  - name: Faults
+    description: Fault reporting and management
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login successful
+        401:
+          description: Invalid credentials
+
+  /transformers:
+    get:
+      tags: [Transformers]
+      summary: Get all transformers with filters
+      parameters:
+        - name: territory_id
+          in: query
+          schema:
+            type: string
+        - name: service_area_id
+          in: query
+          schema:
+            type: string
+        - name: network_voltage_kv
+          in: query
+          schema:
+            type: integer
+            enum: [11, 33]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Active, Faulty, Under Maintenance, Decommissioned]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        200:
+          description: List of transformers
+
+  /transformers:
+    post:
+      tags: [Transformers]
+      summary: Create a new transformer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransformerCreate'
+      responses:
+        201:
+          description: Transformer created
+        400:
+          description: Validation error
+        403:
+          description: Insufficient permissions
+
+components:
+  schemas:
+    TransformerCreate:
+      type: object
+      required:
+        - manufacturer
+        - kva_rating
+        - network_voltage_kv
+        - territory_id
+        - district_id
+        - site_name
+        - latitude
+        - longitude
+      properties:
+        manufacturer:
+          type: string
+        serial_number:
+          type: string
+        kva_rating:
+          type: integer
+          enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]
+        network_voltage_kv:
+          type: integer
+          enum: [11, 33]
+        voltage_secondary:
+          type: string
+          enum: [415V, 240V, Other]
+        phase_type:
+          type: string
+          enum: [Single Phase, Three Phase]
+        cooling_type:
+          type: string
+          enum: [ONAN, ONAF, OFAF]
+        mounting_type:
+          type: string
+          enum: [Pole Mounted, Plinth, Ground, Indoor Substation]
+        territory_id:
+          type: string
+        service_area_id:
+          type: string
+        feeder_name:
+          type: string
+        district_id:
+          type: string
+        sub_county:
+          type: string
+        parish:
+          type: string
+        village:
+          type: string
+        site_name:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        install_date:
+          type: string
+          format: date
+        installing_contractor:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
