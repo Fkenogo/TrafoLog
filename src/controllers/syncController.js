@@ -224,12 +224,4 @@ class SyncController {
   });
 }
 
-const _syncInstance = new SyncController();
-module.exports = new Proxy(_syncInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `syncController.${String(prop)} not yet implemented` });
-  }
-});
+module.exports = new SyncController();

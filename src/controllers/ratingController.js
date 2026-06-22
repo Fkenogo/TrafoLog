@@ -1,6 +1,10 @@
-const stub = new Proxy({}, {
-  get(_, method) {
-    return async (req, res) => res.status(501).json({ success: false, message: `ratingController.${method} not yet implemented` });
-  }
-});
-module.exports = stub;
+const notImpl = (name) => async (req, res) =>
+  res.status(501).json({ success: false, message: `RatingController.${name} not yet implemented` });
+
+module.exports = {
+  getAll: notImpl('getAll'),
+  create: notImpl('create'),
+  update: notImpl('update'),
+  delete: notImpl('delete'),
+  getByNetworkVoltage: notImpl('getByNetworkVoltage'),
+};

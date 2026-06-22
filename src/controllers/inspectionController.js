@@ -65,14 +65,26 @@ class InspectionController {
       next(error);
     }
   }
+
+  async getAll(req, res) {
+    return res.status(501).json({ success: false, message: 'InspectionController.getAll not yet implemented' });
+  }
+
+  async update(req, res) {
+    return res.status(501).json({ success: false, message: 'InspectionController.update not yet implemented' });
+  }
+
+  async delete(req, res) {
+    return res.status(501).json({ success: false, message: 'InspectionController.delete not yet implemented' });
+  }
+
+  async getOverdue(req, res) {
+    return res.status(501).json({ success: false, message: 'InspectionController.getOverdue not yet implemented' });
+  }
+
+  async getLatest(req, res) {
+    return res.status(501).json({ success: false, message: 'InspectionController.getLatest not yet implemented' });
+  }
 }
 
-const _inspectionInstance = new InspectionController();
-module.exports = new Proxy(_inspectionInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `inspectionController.${String(prop)} not yet implemented` });
-  }
-});
+module.exports = new InspectionController();

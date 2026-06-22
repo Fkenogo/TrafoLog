@@ -38,8 +38,12 @@ class AuthService extends BaseService {
 
       await user.save();
 
-      // Send verification email
-      await this.sendVerificationEmail(user, verificationToken);
+      // Send verification email — non-fatal; SMTP may not be configured in dev/test
+      try {
+        await this.sendVerificationEmail(user, verificationToken);
+      } catch (emailError) {
+        logger.warn('Verification email could not be sent:', emailError.message);
+      }
 
       // Log action
       await this.logAction({

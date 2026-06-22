@@ -1,6 +1,9 @@
-const stub = new Proxy({}, {
-  get(_, method) {
-    return async (req, res) => res.status(501).json({ success: false, message: `auditController.${method} not yet implemented` });
-  }
-});
-module.exports = stub;
+const notImpl = (name) => async (req, res) =>
+  res.status(501).json({ success: false, message: `AuditController.${name} not yet implemented` });
+
+module.exports = {
+  getAuditLogs: notImpl('getAuditLogs'),
+  getUserAuditLogs: notImpl('getUserAuditLogs'),
+  getTransformerAuditLogs: notImpl('getTransformerAuditLogs'),
+  getAuditActions: notImpl('getAuditActions'),
+};

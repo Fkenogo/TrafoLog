@@ -131,14 +131,34 @@ class TransformerController {
       next(error);
     }
   }
+
+  async search(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.search not yet implemented' });
+  }
+
+  async getByServiceArea(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.getByServiceArea not yet implemented' });
+  }
+
+  async getNearby(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.getNearby not yet implemented' });
+  }
+
+  async getTimeline(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.getTimeline not yet implemented' });
+  }
+
+  async getQRCode(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.getQRCode not yet implemented' });
+  }
+
+  async decommission(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.decommission not yet implemented' });
+  }
+
+  async bulkCreate(req, res) {
+    return res.status(501).json({ success: false, message: 'TransformerController.bulkCreate not yet implemented' });
+  }
 }
 
-const _transformerInstance = new TransformerController();
-module.exports = new Proxy(_transformerInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `transformerController.${String(prop)} not yet implemented` });
-  }
-});
+module.exports = new TransformerController();

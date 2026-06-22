@@ -173,12 +173,4 @@ class ImportController {
   });
 }
 
-const _importInstance = new ImportController();
-module.exports = new Proxy(_importInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `importController.${String(prop)} not yet implemented` });
-  }
-});
+module.exports = new ImportController();

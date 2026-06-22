@@ -1,4 +1,5 @@
 const AuthService = require('../services/authService');
+const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/helpers');
 const { validate } = require('../utils/validation');
 
@@ -329,12 +330,20 @@ class AuthController {
   }
 }
 
-const _authInstance = new AuthController();
-module.exports = new Proxy(_authInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `authController.${String(prop)} not yet implemented` });
-  }
-});
+const _ctrl = new AuthController();
+module.exports = {
+  register: _ctrl.register.bind(_ctrl),
+  login: _ctrl.login.bind(_ctrl),
+  refreshToken: _ctrl.refreshToken.bind(_ctrl),
+  logout: _ctrl.logout.bind(_ctrl),
+  logoutAll: _ctrl.logoutAll.bind(_ctrl),
+  forgotPassword: _ctrl.forgotPassword.bind(_ctrl),
+  resetPassword: _ctrl.resetPassword.bind(_ctrl),
+  verifyEmail: _ctrl.verifyEmail.bind(_ctrl),
+  resendVerification: _ctrl.resendVerification.bind(_ctrl),
+  changePassword: _ctrl.changePassword.bind(_ctrl),
+  getMe: _ctrl.getMe.bind(_ctrl),
+  updateMe: _ctrl.updateMe.bind(_ctrl),
+  getSessions: _ctrl.getSessions.bind(_ctrl),
+  revokeSession: _ctrl.revokeSession.bind(_ctrl),
+};

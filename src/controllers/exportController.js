@@ -1,6 +1,9 @@
-const stub = new Proxy({}, {
-  get(_, method) {
-    return async (req, res) => res.status(501).json({ success: false, message: `exportController.${method} not yet implemented` });
-  }
-});
-module.exports = stub;
+const notImpl = (name) => async (req, res) =>
+  res.status(501).json({ success: false, message: `ExportController.${name} not yet implemented` });
+
+module.exports = {
+  exportToCSV: notImpl('exportToCSV'),
+  exportToExcel: notImpl('exportToExcel'),
+  exportToPDF: notImpl('exportToPDF'),
+  downloadExport: notImpl('downloadExport'),
+};

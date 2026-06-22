@@ -402,9 +402,10 @@ class App {
   }
 }
 
-// Create and start the application
 const app = new App();
-app.start();
 
-// Export for testing
+if (require.main === module) {
+  app.start();
+}
+
 module.exports = app;

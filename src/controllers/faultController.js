@@ -87,14 +87,30 @@ class FaultController {
       next(error);
     }
   }
+
+  async getAll(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.getAll not yet implemented' });
+  }
+
+  async getById(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.getById not yet implemented' });
+  }
+
+  async getAssignedToMe(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.getAssignedToMe not yet implemented' });
+  }
+
+  async close(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.close not yet implemented' });
+  }
+
+  async escalate(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.escalate not yet implemented' });
+  }
+
+  async delete(req, res) {
+    return res.status(501).json({ success: false, message: 'FaultController.delete not yet implemented' });
+  }
 }
 
-const _faultInstance = new FaultController();
-module.exports = new Proxy(_faultInstance, {
-  get(target, prop) {
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    if (typeof prop === 'symbol') return val;
-    return async (req, res) => res.status(501).json({ success: false, message: `faultController.${String(prop)} not yet implemented` });
-  }
-});
+module.exports = new FaultController();

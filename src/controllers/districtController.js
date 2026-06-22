@@ -1,6 +1,8 @@
-const stub = new Proxy({}, {
-  get(_, method) {
-    return async (req, res) => res.status(501).json({ success: false, message: `districtController.${method} not yet implemented` });
-  }
-});
-module.exports = stub;
+const notImpl = (name) => async (req, res) =>
+  res.status(501).json({ success: false, message: `DistrictController.${name} not yet implemented` });
+
+module.exports = {
+  getAll: notImpl('getAll'),
+  getById: notImpl('getById'),
+  getByRegion: notImpl('getByRegion'),
+};

@@ -1,6 +1,14 @@
-const stub = new Proxy({}, {
-  get(_, method) {
-    return async (req, res) => res.status(501).json({ success: false, message: `userController.${method} not yet implemented` });
-  }
-});
-module.exports = stub;
+const notImpl = (name) => async (req, res) =>
+  res.status(501).json({ success: false, message: `UserController.${name} not yet implemented` });
+
+module.exports = {
+  getAllUsers: notImpl('getAllUsers'),
+  getUserById: notImpl('getUserById'),
+  createUser: notImpl('createUser'),
+  updateUser: notImpl('updateUser'),
+  deleteUser: notImpl('deleteUser'),
+  activateUser: notImpl('activateUser'),
+  deactivateUser: notImpl('deactivateUser'),
+  changeUserRole: notImpl('changeUserRole'),
+  getUsersInMyTerritory: notImpl('getUsersInMyTerritory'),
+};
