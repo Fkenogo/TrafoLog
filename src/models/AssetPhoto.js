@@ -135,7 +135,6 @@ assetPhotoSchema.pre('save', function(next) {
       this.orientation = 'square';
     }
   }
-  next();
 });
 
 // Methods

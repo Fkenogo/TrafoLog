@@ -129,7 +129,6 @@ notificationSchema.pre('save', function(next) {
     const days = expiryMap[this.priority] || 30;
     this.expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
-  next();
 });
 
 // Methods

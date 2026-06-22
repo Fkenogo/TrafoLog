@@ -244,7 +244,6 @@ maintenanceSchema.pre('save', function(next) {
     }
   }
   
-  next();
 });
 
 // Methods

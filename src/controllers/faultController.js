@@ -89,4 +89,12 @@ class FaultController {
   }
 }
 
-module.exports = new FaultController();
+const _faultInstance = new FaultController();
+module.exports = new Proxy(_faultInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `faultController.${String(prop)} not yet implemented` });
+  }
+});

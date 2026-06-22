@@ -39,7 +39,6 @@ transformerRatingSchema.index(
 // Pre-save middleware
 transformerRatingSchema.pre('save', function(next) {
   this.display_label = `${this.kva}kVA/${this.network_voltage_kv}kV`;
-  next();
 });
 
 module.exports = mongoose.model('TransformerRating', transformerRatingSchema);

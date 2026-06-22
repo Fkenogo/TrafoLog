@@ -289,4 +289,12 @@ class TimelineController {
   });
 }
 
-module.exports = new TimelineController();
+const _timelineInstance = new TimelineController();
+module.exports = new Proxy(_timelineInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `timelineController.${String(prop)} not yet implemented` });
+  }
+});

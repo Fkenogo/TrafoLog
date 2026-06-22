@@ -181,7 +181,6 @@ transformerSchema.pre('save', function(next) {
     // Set display_rating
     this.display_rating = `${this.kva_rating}kVA/${this.network_voltage_kv}kV`;
   }
-  next();
 });
 
 // Methods

@@ -161,7 +161,6 @@ qrCodeSchema.pre('save', function(next) {
     // This will be populated in service layer
   }
   
-  next();
 });
 
 // Methods

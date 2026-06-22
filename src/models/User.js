@@ -156,20 +156,18 @@ userSchema.index({ reset_password_token: 1 });
 userSchema.index({ email_verification_token: 1 });
 
 // Pre-save middleware
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function() {
   // Hash password if modified
   if (this.isModified('password')) {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
   }
-  
+
   // Set email verification token for new users
   if (this.isNew) {
     this.email_verification_token = crypto.randomBytes(32).toString('hex');
     this.email_verification_expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
   }
-  
-  next();
 });
 
 // Instance methods

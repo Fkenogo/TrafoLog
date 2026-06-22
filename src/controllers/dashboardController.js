@@ -180,4 +180,12 @@ class DashboardController {
   });
 }
 
-module.exports = new DashboardController();
+const _dashboardInstance = new DashboardController();
+module.exports = new Proxy(_dashboardInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `dashboardController.${String(prop)} not yet implemented` });
+  }
+});

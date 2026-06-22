@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const SyncController = require('../controllers/syncController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 /**
  * @route POST /api/sync/offline-queue

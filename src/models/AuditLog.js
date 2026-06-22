@@ -187,7 +187,6 @@ auditLogSchema.pre('save', function(next) {
     'USER_ROLE_CHANGE', 'USER_CREATE', 'USER_DELETE'
   ];
   this.is_sensitive = sensitiveActions.includes(this.action);
-  next();
 });
 
 // ToJSON transformation

@@ -220,4 +220,12 @@ class NotificationController {
   });
 }
 
-module.exports = new NotificationController();
+const _notificationInstance = new NotificationController();
+module.exports = new Proxy(_notificationInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `notificationController.${String(prop)} not yet implemented` });
+  }
+});

@@ -182,7 +182,6 @@ installationSchema.pre('save', function(next) {
     this.handover_date = new Date();
   }
   
-  next();
 });
 
 // Methods

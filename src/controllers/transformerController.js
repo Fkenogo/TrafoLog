@@ -133,4 +133,12 @@ class TransformerController {
   }
 }
 
-module.exports = new TransformerController();
+const _transformerInstance = new TransformerController();
+module.exports = new Proxy(_transformerInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `transformerController.${String(prop)} not yet implemented` });
+  }
+});

@@ -204,4 +204,12 @@ class MaintenanceController {
   });
 }
 
-module.exports = new MaintenanceController();
+const _maintenanceInstance = new MaintenanceController();
+module.exports = new Proxy(_maintenanceInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `maintenanceController.${String(prop)} not yet implemented` });
+  }
+});

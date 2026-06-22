@@ -5,16 +5,16 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "seed": "node scripts/seed.js",
-    "migrate": "node scripts/migration.js",
-    "migrate:list": "node scripts/migration.js list",
-    "migrate:status": "node scripts/migration.js status",
-    "migrate:run": "node scripts/migration.js run",
-    "create-indexes": "node scripts/createIndexes.js",
-    "create-indexes:list": "node scripts/createIndexes.js list",
-    "create-indexes:validate": "node scripts/createIndexes.js validate",
-    "create-indexes:repair": "node scripts/createIndexes.js repair"
-    
+    "seed": "node src/scripts/seed.js",
+    "migrate": "node src/scripts/migration.js",
+    "migrate:list": "node src/scripts/migration.js list",
+    "migrate:status": "node src/scripts/migration.js status",
+    "migrate:run": "node src/scripts/migration.js run",
+    "create-indexes": "node src/scripts/createIndexes.js",
+    "create-indexes:list": "node src/scripts/createIndexes.js list",
+    "create-indexes:validate": "node src/scripts/createIndexes.js validate",
+    "create-indexes:repair": "node src/scripts/createIndexes.js repair",
+    "test": "jest --testPathPatterns=src/tests --forceExit"
   },
   "keywords": [],
   "author": "",

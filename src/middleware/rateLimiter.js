@@ -9,10 +9,7 @@ const rateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false,
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress;
-  }
+  skipSuccessfulRequests: false
 });
 
 module.exports = rateLimiter;

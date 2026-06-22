@@ -97,7 +97,6 @@ faultSchema.pre('save', function(next) {
       (this.resolved_date - this.fault_date) / (1000 * 60 * 60)
     );
   }
-  next();
 });
 
 module.exports = mongoose.model('Fault', faultSchema);

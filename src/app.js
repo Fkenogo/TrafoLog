@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -214,53 +215,11 @@ class App {
    * Setup all routes
    */
   setupRoutes() {
-    // Mount all route modules from routes/index.js
-    // Auth routes
-    this.app.use('/api/auth', routes.authRoutes);
-    
-    // User management
-    this.app.use('/api/users', routes.userRoutes);
-    
-    // Core asset management
-    this.app.use('/api/transformers', routes.transformerRoutes);
-    this.app.use('/api/inspections', routes.inspectionRoutes);
-    this.app.use('/api/maintenance', routes.maintenanceRoutes);
-    this.app.use('/api/faults', routes.faultRoutes);
-    this.app.use('/api/installations', routes.installationRoutes);
-    
-    // Dashboard and analytics
-    this.app.use('/api/dashboard', routes.dashboardRoutes);
-    this.app.use('/api/analytics', routes.analyticsRoutes);
-    
-    // Reporting and exports
-    this.app.use('/api/reports', routes.reportRoutes);
-    this.app.use('/api/exports', routes.exportRoutes);
-    
-    // Data management
-    this.app.use('/api/import', routes.importRoutes);
-    this.app.use('/api/sync', routes.syncRoutes);
-    
-    // Notifications and timeline
-    this.app.use('/api/notifications', routes.notificationRoutes);
-    this.app.use('/api/timeline', routes.timelineRoutes);
-    
-    // Admin and audit
-    this.app.use('/api/admin', routes.adminRoutes);
-    this.app.use('/api/audit', routes.auditRoutes);
-    
-    // Reference data
-    this.app.use('/api/territories', routes.territoryRoutes);
-    this.app.use('/api/service-areas', routes.serviceAreaRoutes);
-    this.app.use('/api/feeders', routes.feederRoutes);
-    this.app.use('/api/districts', routes.districtRoutes);
-    this.app.use('/api/ratings', routes.ratingRoutes);
-    
-    // Utilities
-    this.app.use('/api/qr', routes.qrRoutes);
-    this.app.use('/api/geo', routes.geoRoutes);
-    
+    // routes/index.js already mounts all sub-routes internally and exports one router
+    this.app.use('/api', routes);
+
     // 404 handler for unmatched routes
-    this.app.use('*', (req, res) => {
+    this.app.use('/{*wildcard}', (req, res) => {
       res.status(404).json({
         success: false,
         message: `Route ${req.originalUrl} not found`,

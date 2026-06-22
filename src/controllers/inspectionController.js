@@ -67,4 +67,12 @@ class InspectionController {
   }
 }
 
-module.exports = new InspectionController();
+const _inspectionInstance = new InspectionController();
+module.exports = new Proxy(_inspectionInstance, {
+  get(target, prop) {
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    if (typeof prop === 'symbol') return val;
+    return async (req, res) => res.status(501).json({ success: false, message: `inspectionController.${String(prop)} not yet implemented` });
+  }
+});

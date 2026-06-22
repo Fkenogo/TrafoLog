@@ -286,7 +286,6 @@ inspectionSchema.pre('save', function(next) {
     }
   }
   
-  next();
 });
 
 // Methods

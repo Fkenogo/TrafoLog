@@ -197,7 +197,6 @@ timelineSchema.pre('save', function(next) {
   if (this.isNew) {
     // This will be populated in service layer
   }
-  next();
 });
 
 // ToJSON transformation
