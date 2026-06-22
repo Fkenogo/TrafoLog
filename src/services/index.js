@@ -1,51 +1,51 @@
-const AuthService = require('./authService');
-const UserService = require('./userService');
-const TransformerService = require('./transformerService');
-const InspectionService = require('./inspectionService');
-const MaintenanceService = require('./maintenanceService');
-const FaultService = require('./faultService');
-const InstallationService = require('./installationService');
-const NotificationService = require('./notificationService');
-const DashboardService = require('./dashboardService');
-const ReportService = require('./reportService');
-const ImportService = require('./importService');
-const TimelineService = require('./timelineService');
-const SyncService = require('./syncService');
 const AdminService = require('./adminService');
-const TerritoryService = require('./territoryService');
-const ServiceAreaService = require('./serviceAreaService');
-const FeederService = require('./feederService');
-const DistrictService = require('./districtService');
-const RatingService = require('./ratingService');
 const AnalyticsService = require('./analyticsService');
-const ExportService = require('./exportService');
+const AuthService = require('./authService');
 const AuditService = require('./auditService');
-const QRService = require('./qrService');
+const DashboardService = require('./dashboardService');
+const DistrictService = require('./districtService');
+const ExportService = require('./exportService');
+const FaultService = require('./faultService');
+const FeederService = require('./feederService');
 const GeoService = require('./geoService');
+const ImportService = require('./importService');
+const InspectionService = require('./inspectionService');
+const InstallationService = require('./installationService');
+const MaintenanceService = require('./maintenanceService');
+const NotificationService = require('./notificationService');
+const QRService = require('./qrService');
+const RatingService = require('./ratingService');
+const ReportService = require('./reportService'); // Change to './reportingService' if your file name has the -ing
+const ServiceAreaService = require('./serviceAreaService');
+const SyncService = require('./syncService');
+const TerritoryService = require('./territoryService');
+const TimelineService = require('./timelineService');
+const TransformerService = require('./transformerService');
+const UserService = require('./userService');
 
 module.exports = {
-  AuthService,
-  UserService,
-  TransformerService,
-  InspectionService,
-  MaintenanceService,
-  FaultService,
-  InstallationService,
-  NotificationService,
-  DashboardService,
-  ReportService,
-  ImportService,
-  TimelineService,
-  SyncService,
   AdminService,
-  TerritoryService,
-  ServiceAreaService,
-  FeederService,
-  DistrictService,
-  RatingService,
   AnalyticsService,
-  ExportService,
+  AuthService,
   AuditService,
+  DashboardService,
+  DistrictService,
+  ExportService,
+  FaultService,
+  FeederService,
+  GeoService,
+  ImportService,
+  InspectionService,
+  InstallationService,
+  MaintenanceService,
+  NotificationService,
   QRService,
-  GeoService
+  RatingService,
+  ReportService,
+  ServiceAreaService,
+  SyncService,
+  TerritoryService,
+  TimelineService,
+  TransformerService,
+  UserService
 };

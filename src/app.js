@@ -16,11 +16,11 @@ const redis = require('./config/redis');
 
 // Middleware
 const { errorHandler } = require('./middleware/errorHandler');
+const { authenticate } = require('./middleware/auth');
+const rateLimiter = require('./middleware/rateLimiter');
 
 // Routes
 const routes = require('./routes');
-// 🌟 Direct import for authRoutes to completely bypass any packaging errors in routes/index.js
-const authRoutes = require('./routes/authRoutes'); 
 
 // WebSocket
 const WebSocketManager = require('./websocket');
@@ -36,158 +36,416 @@ class App {
     this.port = process.env.PORT || 3000;
     
     this.setupMiddleware();
-    this.setupSwagger(); // Initialized before core API routes
+    this.setupSwagger();
     this.setupRoutes();
     this.setupWebSocket();
     this.setupJobs();
     this.setupErrorHandling();
   }
   
+  /**
+   * Setup all middleware
+   */
   setupMiddleware() {
-    // Security
-    this.app.use(helmet());
+    // Security headers
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'", process.env.CLIENT_URL]
+        }
+      }
+    }));
+    
+    // CORS
     this.app.use(cors({
-      origin: process.env.CLIENT_URL,
+      origin: process.env.CLIENT_URL || 'http://localhost:5173',
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-      allowedHeaders: ['Content-Type', 'Authorization']
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['Content-Disposition']
     }));
 
     // Cookie parsing
     this.app.use(cookieParser());
     
     // Compression
-    this.app.use(compression());
-    
-    // Logging
-    this.app.use(morgan('combined', {
-      stream: {
-        write: (message) => console.log(message.trim())
+    this.app.use(compression({
+      level: 6,
+      threshold: 100 * 1024, // 100KB
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) {
+          return false;
+        }
+        return compression.filter(req, res);
       }
     }));
     
-    // Body parsing
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    // Logging with custom format
+    this.app.use(morgan(':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" - :response-time ms', {
+      stream: {
+        write: (message) => {
+          // Only log in development or if log level is set
+          if (process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug') {
+            console.log(message.trim());
+          }
+        }
+      }
+    }));
     
-    // Static files
-    this.app.use('/uploads', express.static('uploads'));
+    // Body parsing with size limits
+    this.app.use(express.json({ 
+      limit: '10mb',
+      verify: (req, res, buf) => {
+        req.rawBody = buf;
+      }
+    }));
+    this.app.use(express.urlencoded({ 
+      extended: true, 
+      limit: '10mb' 
+    }));
     
-    // Health check
+    // Rate limiting (applied to all routes except health)
+    this.app.use('/api', rateLimiter);
+    
+    // Static files with caching
+    this.app.use('/uploads', express.static('uploads', {
+      maxAge: '7d',
+      etag: true,
+      lastModified: true
+    }));
+    
+    // Health check endpoint (no authentication)
     this.app.get('/health', (req, res) => {
-      res.json({
+      const health = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: require('../package.json').version,
+        services: {
+          database: database.isConnected ? 'connected' : 'disconnected',
+          redis: redis.isConnected ? 'connected' : 'disconnected',
+          websocket: this.wsManager ? 'running' : 'stopped'
+        }
+      };
+      
+      const statusCode = database.isConnected && redis.isConnected ? 200 : 503;
+      res.status(statusCode).json(health);
+    });
+    
+    // API root endpoint
+    this.app.get('/api', (req, res) => {
+      res.status(200).json({
+        success: true,
+        message: 'kVAssetTracker API v2.0',
+        version: require('../package.json').version,
+        endpoints: {
+          auth: '/api/auth',
+          users: '/api/users',
+          transformers: '/api/transformers',
+          inspections: '/api/inspections',
+          maintenance: '/api/maintenance',
+          faults: '/api/faults',
+          installations: '/api/installations',
+          dashboard: '/api/dashboard',
+          reports: '/api/reports',
+          import: '/api/import',
+          notifications: '/api/notifications',
+          timeline: '/api/timeline',
+          sync: '/api/sync',
+          admin: '/api/admin'
+        },
+        documentation: '/api-docs',
+        health: '/health'
       });
     });
   }
 
+  /**
+   * Setup Swagger documentation
+   */
   setupSwagger() {
     try {
-      // Correct path resolution mapping back to root level swagger.yaml
       const swaggerPath = path.join(__dirname, '../swagger.yaml');
       
       if (fs.existsSync(swaggerPath)) {
         const swaggerDocument = YAML.load(swaggerPath);
         
-        // Expose interactive interface
-        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+        // Add server info dynamically
+        swaggerDocument.servers = [
+          {
+            url: `http://localhost:${this.port}`,
+            description: 'Development server'
+          },
+          {
+            url: process.env.API_URL || `https://api.kVAssetTracker.com`,
+            description: 'Production server'
+          }
+        ];
+        
+        // Swagger UI options
+        const swaggerOptions = {
+          explorer: true,
+          customCss: '.swagger-ui .topbar { display: none }',
+          customSiteTitle: 'kVAssetTracker API Documentation',
+          swaggerOptions: {
+            persistAuthorization: true,
+            displayRequestDuration: true,
+            filter: true,
+            tryItOutEnabled: true
+          }
+        };
+        
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
+        console.log('✅ Swagger documentation available at /api-docs');
       } else {
-        console.warn('⚠️ swagger.yaml file missing at root folder. Documentation fallback bypassed.');
+        console.warn('⚠️ swagger.yaml file missing. Documentation not available.');
       }
     } catch (error) {
-      console.error('❌ Failed to parse or hook up Swagger documentation:', error);
+      console.error('❌ Failed to setup Swagger documentation:', error.message);
     }
   }
   
+  /**
+   * Setup all routes
+   */
   setupRoutes() {
-    // API routes
-    // 🌟 Using the safely imported authRoutes module directly here
-    this.app.use('/api/auth', authRoutes); 
+    // Mount all route modules from routes/index.js
+    // Auth routes
+    this.app.use('/api/auth', routes.authRoutes);
     
+    // User management
+    this.app.use('/api/users', routes.userRoutes);
+    
+    // Core asset management
     this.app.use('/api/transformers', routes.transformerRoutes);
     this.app.use('/api/inspections', routes.inspectionRoutes);
     this.app.use('/api/maintenance', routes.maintenanceRoutes);
     this.app.use('/api/faults', routes.faultRoutes);
     this.app.use('/api/installations', routes.installationRoutes);
+    
+    // Dashboard and analytics
     this.app.use('/api/dashboard', routes.dashboardRoutes);
+    this.app.use('/api/analytics', routes.analyticsRoutes);
+    
+    // Reporting and exports
     this.app.use('/api/reports', routes.reportRoutes);
+    this.app.use('/api/exports', routes.exportRoutes);
+    
+    // Data management
     this.app.use('/api/import', routes.importRoutes);
+    this.app.use('/api/sync', routes.syncRoutes);
+    
+    // Notifications and timeline
     this.app.use('/api/notifications', routes.notificationRoutes);
     this.app.use('/api/timeline', routes.timelineRoutes);
-    this.app.use('/api/sync', routes.syncRoutes);
-    this.app.use('/api/admin', routes.adminRoutes);
     
-    // 404 handler
-    this.app.use((req, res) => {
+    // Admin and audit
+    this.app.use('/api/admin', routes.adminRoutes);
+    this.app.use('/api/audit', routes.auditRoutes);
+    
+    // Reference data
+    this.app.use('/api/territories', routes.territoryRoutes);
+    this.app.use('/api/service-areas', routes.serviceAreaRoutes);
+    this.app.use('/api/feeders', routes.feederRoutes);
+    this.app.use('/api/districts', routes.districtRoutes);
+    this.app.use('/api/ratings', routes.ratingRoutes);
+    
+    // Utilities
+    this.app.use('/api/qr', routes.qrRoutes);
+    this.app.use('/api/geo', routes.geoRoutes);
+    
+    // 404 handler for unmatched routes
+    this.app.use('*', (req, res) => {
       res.status(404).json({
         success: false,
-        message: 'Route not found'
+        message: `Route ${req.originalUrl} not found`,
+        method: req.method,
+        timestamp: new Date().toISOString(),
+        available_endpoints: '/api for list of all endpoints'
       });
     });
   }
   
+  /**
+   * Setup WebSocket server
+   */
   setupWebSocket() {
-    this.wsManager = new WebSocketManager(this.server);
+    try {
+      this.wsManager = new WebSocketManager(this.server);
+      
+      // Make WebSocket manager available to services
+      this.app.set('wsManager', this.wsManager);
+      
+      // Also make it available globally for services
+      global.wsManager = this.wsManager;
+      
+      console.log('✅ WebSocket server initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize WebSocket server:', error.message);
+    }
   }
   
+  /**
+   * Setup scheduled jobs
+   */
   setupJobs() {
-    // Start scheduled jobs
-    OverdueInspectionChecker.start();
-    OverloadDetector.start();
+    try {
+      // Start overdue inspection checker
+      OverdueInspectionChecker.start();
+      console.log('✅ Overdue inspection checker started');
+      
+      // Start overload detector
+      OverloadDetector.start();
+      console.log('✅ Overload detector started');
+      
+      // Additional jobs can be started here
+    } catch (error) {
+      console.error('❌ Failed to start scheduled jobs:', error.message);
+    }
   }
   
+  /**
+   * Setup error handling
+   */
   setupErrorHandling() {
+    // Global error handler
     this.app.use(errorHandler);
+    
+    // Uncaught exception handler
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+      // Gracefully shutdown if critical
+      if (error.code === 'EADDRINUSE') {
+        console.error('Port already in use. Exiting...');
+        process.exit(1);
+      }
+    });
+    
+    // Unhandled rejection handler
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      // Don't exit, but log appropriately
+    });
   }
   
+  /**
+   * Start the application
+   */
   async start() {
     try {
       // Connect to databases
+      console.log('🔌 Connecting to MongoDB...');
       await database.connect();
+      console.log('✅ MongoDB connected successfully');
+      
+      console.log('🔌 Connecting to Redis...');
       await redis.connect();
+      console.log('✅ Redis connected successfully');
       
       // Start server
       this.server.listen(this.port, () => {
-        console.log(`Server running on port ${this.port}`);
-        console.log(`Environment: ${process.env.NODE_ENV}`);
-        console.log(`Swagger Docs available at http://localhost:${this.port}/api-docs`);
+        console.log('='.repeat(60));
+        console.log(`🚀 kVAssetTracker Server`);
+        console.log('='.repeat(60));
+        console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🌐 Server URL: http://localhost:${this.port}`);
+        console.log(`📚 API Docs: http://localhost:${this.port}/api-docs`);
+        console.log(`💚 Health Check: http://localhost:${this.port}/health`);
+        console.log(`🔌 WebSocket: ws://localhost:${this.port}`);
+        console.log('='.repeat(60));
+        console.log('✅ Server is ready to accept connections');
       });
       
-      // Graceful shutdown
+      // Setup graceful shutdown
       this.setupGracefulShutdown();
       
     } catch (error) {
-      console.error('Failed to start server:', error);
+      console.error('❌ Failed to start server:', error.message);
+      console.error(error.stack);
       process.exit(1);
     }
   }
   
+  /**
+   * Setup graceful shutdown
+   */
   setupGracefulShutdown() {
-    const shutdown = async () => {
-      console.log('Received shutdown signal, closing gracefully...');
+    const shutdown = async (signal) => {
+      console.log(`\n⚠️ Received ${signal}, shutting down gracefully...`);
       
-      // Close server
-      await new Promise((resolve) => {
-        this.server.close(resolve);
-      });
+      const shutdownTimeout = setTimeout(() => {
+        console.error('❌ Forced shutdown after timeout');
+        process.exit(1);
+      }, 30000);
       
-      // Close database connections
-      await database.disconnect();
-      await redis.disconnect();
-      
-      console.log('Server closed');
-      process.exit(0);
+      try {
+        // Close WebSocket connections
+        if (this.wsManager) {
+          console.log('📡 Closing WebSocket connections...');
+          this.wsManager.closeAll();
+        }
+        
+        // Close HTTP server
+        console.log('🌐 Closing HTTP server...');
+        await new Promise((resolve) => {
+          this.server.close(resolve);
+        });
+        
+        // Close database connections
+        console.log('🗄️ Closing database connections...');
+        await database.disconnect();
+        await redis.disconnect();
+        
+        clearTimeout(shutdownTimeout);
+        console.log('✅ Graceful shutdown completed');
+        process.exit(0);
+        
+      } catch (error) {
+        console.error('❌ Error during shutdown:', error.message);
+        process.exit(1);
+      }
     };
     
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+    // Register signal handlers
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    
+    // Handle cleanup on exit
+    process.on('exit', (code) => {
+      console.log(`Process exiting with code: ${code}`);
+    });
+  }
+  
+  /**
+   * Get the WebSocket manager instance
+   */
+  getWebSocketManager() {
+    return this.wsManager;
+  }
+  
+  /**
+   * Get the express app instance
+   */
+  getApp() {
+    return this.app;
+  }
+  
+  /**
+   * Get the server instance
+   */
+  getServer() {
+    return this.server;
   }
 }
 
-// Start the application
+// Create and start the application
 const app = new App();
 app.start();
 
+// Export for testing
 module.exports = app;
