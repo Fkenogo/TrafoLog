@@ -24,10 +24,30 @@ class NotificationService extends BaseService {
    * Send notification to user
    */
   async sendNotification(userId, type, message, data = {}) {
+    const NOTIFICATION_TITLES = {
+      FAULT_ALERT: 'Fault Alert',
+      FAULT_ASSIGNED: 'Fault Assigned',
+      FAULT_RESOLVED: 'Fault Resolved',
+      FAULT_ESCALATED: 'Fault Escalated',
+      FAULT_REOPENED: 'Fault Reopened',
+      INSPECTION_ALERT: 'Inspection Alert',
+      OVERLOAD_ALERT: 'Overload Alert',
+      OVERDUE_INSPECTION: 'Overdue Inspection',
+      MAINTENANCE_ALERT: 'Maintenance Alert',
+      MAINTENANCE_SCHEDULED: 'Maintenance Scheduled',
+      SYSTEM_ALERT: 'System Alert',
+      USER_ACTION_REQUIRED: 'Action Required',
+      TRANSFORMER_VERIFIED: 'Transformer Verified',
+      TRANSFORMER_DECOMMISSIONED: 'Transformer Decommissioned',
+      IMPORT_COMPLETED: 'Import Completed',
+      REPORT_READY: 'Report Ready'
+    };
+
     try {
       const notification = new this.model({
         user_id: userId,
         type: type,
+        title: NOTIFICATION_TITLES[type] || type,
         message: message,
         data: data,
         is_read: false
@@ -48,7 +68,7 @@ class NotificationService extends BaseService {
 
       return notification;
     } catch (error) {
-      logger.error('Error sending notification:', error);
+      logger.warn('Error sending notification (non-fatal):', error.message);
       throw error;
     }
   }
@@ -102,7 +122,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending fault alert:', error);
+      logger.warn('NotificationService.sendFaultAlert failed (non-fatal):', error);
       throw error;
     }
   }
@@ -145,7 +165,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending inspection alert:', error);
+      logger.warn('NotificationService.sendInspectionAlert failed (non-fatal):', error);
       throw error;
     }
   }
@@ -185,7 +205,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending overload alert:', error);
+      logger.warn('NotificationService.sendOverloadAlert failed (non-fatal):', error);
       throw error;
     }
   }
@@ -224,7 +244,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending assignment notification:', error);
+      logger.warn('NotificationService.sendAssignmentNotification failed (non-fatal):', error);
       throw error;
     }
   }
@@ -259,7 +279,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending resolution notification:', error);
+      logger.warn('NotificationService.sendResolutionNotification failed (non-fatal):', error);
       throw error;
     }
   }
@@ -294,7 +314,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending escalation notification:', error);
+      logger.warn('NotificationService.sendEscalationNotification failed (non-fatal):', error);
       throw error;
     }
   }
@@ -329,7 +349,7 @@ class NotificationService extends BaseService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error sending overdue inspection alert:', error);
+      logger.warn('NotificationService.sendOverdueInspectionAlert failed (non-fatal):', error);
       throw error;
     }
   }
@@ -366,7 +386,7 @@ class NotificationService extends BaseService {
 
       return await User.find(query);
     } catch (error) {
-      logger.error('Error getting users for alert:', error);
+      logger.warn('NotificationService.getUsersForAlert failed:', error);
       return [];
     }
   }

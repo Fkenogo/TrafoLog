@@ -50,6 +50,7 @@ describe('Authentication Tests', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.accessToken).toBeDefined();
+    expect(res.body.data.refreshToken).toBeUndefined();
     expect(res.body.data.user).toBeDefined();
 
     accessToken = res.body.data.accessToken;
@@ -61,6 +62,13 @@ describe('Authentication Tests', () => {
     }
   });
 
+  test('login creates an AuditLog entry with AUTH category', async () => {
+    const AuditLog = require('../models/AuditLog');
+    const entry = await AuditLog.findOne({ action: 'LOGIN' }).sort({ created_at: -1 });
+    expect(entry).not.toBeNull();
+    expect(entry.action_category).toBe('AUTH');
+  });
+
   test('Get user profile with token', async () => {
     const res = await request(app.getApp())
       .get('/api/auth/me')
@@ -70,13 +78,34 @@ describe('Authentication Tests', () => {
     expect(res.body.data.email).toBe('test@example.com');
   });
 
-  test('Refresh token', async () => {
+  test('Refresh token using HTTP-only cookie only', async () => {
+    const res = await request(app.getApp())
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`])
+      .send({});
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.accessToken).toBeDefined();
+    expect(res.body.data.refreshToken).toBeUndefined();
+  });
+
+  test('Refresh token using request body token', async () => {
     const res = await request(app.getApp())
       .post('/api/auth/refresh')
       .send({ refreshToken });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.accessToken).toBeDefined();
+    expect(res.body.data.refreshToken).toBeUndefined();
+  });
+
+  test('Refresh token rejects requests without cookie or body token', async () => {
+    const res = await request(app.getApp())
+      .post('/api/auth/refresh')
+      .send({});
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body.message).toBe('Refresh token required');
   });
 
   test('Logout user', async () => {

@@ -66,24 +66,84 @@ class InspectionController {
     }
   }
 
-  async getAll(req, res) {
-    return res.status(501).json({ success: false, message: 'InspectionController.getAll not yet implemented' });
+  async getAll(req, res, next) {
+    try {
+      const {
+        page = 1, limit = 20, transformer_id, inspector_id,
+        visit_type, condition, overloaded, recommended_action,
+        startDate, endDate
+      } = req.query;
+
+      const filters = { is_deleted: false };
+      if (transformer_id) filters.transformer_id = transformer_id;
+      if (inspector_id) filters.inspector_id = inspector_id;
+      if (visit_type) filters.visit_type = visit_type;
+      if (condition) filters['physical.overall_condition'] = condition;
+      if (overloaded !== undefined) filters['electrical.overload_flag'] = overloaded === 'true';
+      if (recommended_action) filters.recommended_action = recommended_action;
+      if (startDate || endDate) {
+        filters.inspection_date = {};
+        if (startDate) filters.inspection_date.$gte = new Date(startDate);
+        if (endDate) filters.inspection_date.$lte = new Date(endDate);
+      }
+
+      const result = await InspectionService.getAll(filters, {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sort: { inspection_date: -1 },
+        populate: ['inspector_id']
+      });
+
+      return successResponse(res, 200, 'Inspections retrieved successfully', result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async update(req, res) {
-    return res.status(501).json({ success: false, message: 'InspectionController.update not yet implemented' });
+  async update(req, res, next) {
+    try {
+      const updated = await InspectionService.updateInspection(
+        req.params.id,
+        req.body,
+        req.user.id,
+        req.files || []
+      );
+      return successResponse(res, 200, 'Inspection updated successfully', updated);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async delete(req, res) {
-    return res.status(501).json({ success: false, message: 'InspectionController.delete not yet implemented' });
+  async delete(req, res, next) {
+    try {
+      const result = await InspectionService.deleteInspection(req.params.id, req.user.id);
+      return successResponse(res, 200, 'Inspection deleted successfully', result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getOverdue(req, res) {
-    return res.status(501).json({ success: false, message: 'InspectionController.getOverdue not yet implemented' });
+  async getOverdue(req, res, next) {
+    try {
+      const { days = 90 } = req.query;
+      const territoryId = req.user.territory_id;
+      const transformers = await InspectionService.getOverdueInspections(parseInt(days), territoryId);
+      return successResponse(res, 200, 'Overdue inspections retrieved successfully', transformers);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getLatest(req, res) {
-    return res.status(501).json({ success: false, message: 'InspectionController.getLatest not yet implemented' });
+  async getLatest(req, res, next) {
+    try {
+      const inspection = await InspectionService.getLatestInspection(req.params.transformerId);
+      if (!inspection) {
+        return errorResponse(res, 404, 'No inspection found for this transformer');
+      }
+      return successResponse(res, 200, 'Latest inspection retrieved successfully', inspection);
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

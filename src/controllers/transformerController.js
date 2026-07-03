@@ -1,4 +1,6 @@
 const TransformerService = require('../services/transformerService');
+const TimelineService = require('../services/timelineService');
+const QRService = require('../services/qrService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
 class TransformerController {
@@ -132,32 +134,123 @@ class TransformerController {
     }
   }
 
-  async search(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.search not yet implemented' });
+  /**
+   * Search transformers by various criteria
+   * GET /api/transformers/search
+   */
+  async search(req, res, next) {
+    try {
+      const { page = 1, limit = 20, ...filters } = req.query;
+      const result = await TransformerService.searchTransformers(filters, {
+        page: parseInt(page),
+        limit: parseInt(limit)
+      });
+      return successResponse(res, 200, 'Transformers retrieved successfully', result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getByServiceArea(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.getByServiceArea not yet implemented' });
+  /**
+   * Get transformers by service area
+   * GET /api/transformers/service-area/:serviceAreaId
+   */
+  async getByServiceArea(req, res, next) {
+    try {
+      const result = await TransformerService.getTransformersByServiceArea(
+        req.params.serviceAreaId
+      );
+      return successResponse(res, 200, 'Transformers retrieved successfully', result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getNearby(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.getNearby not yet implemented' });
+  /**
+   * Get nearby transformers
+   * GET /api/transformers/nearby?lat=&lng=&radius=&limit=
+   */
+  async getNearby(req, res, next) {
+    try {
+      const { lat, lng, radius = 5, limit = 20 } = req.query;
+      if (!lat || !lng) {
+        return errorResponse(res, 400, 'lat and lng query parameters are required');
+      }
+      const transformers = await TransformerService.getNearbyTransformers(
+        parseFloat(lat),
+        parseFloat(lng),
+        parseFloat(radius),
+        parseInt(limit)
+      );
+      return successResponse(res, 200, 'Nearby transformers retrieved successfully', transformers);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getTimeline(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.getTimeline not yet implemented' });
+  /**
+   * Get transformer timeline
+   * GET /api/transformers/:id/timeline
+   */
+  async getTimeline(req, res, next) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const timeline = await TimelineService.getTransformerTimeline(
+        req.params.id,
+        parseInt(limit),
+        parseInt(page)
+      );
+      return successResponse(res, 200, 'Timeline retrieved successfully', timeline);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async getQRCode(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.getQRCode not yet implemented' });
+  /**
+   * Get or generate transformer QR code
+   * GET /api/transformers/:id/qr
+   */
+  async getQRCode(req, res, next) {
+    try {
+      const qrCode = await QRService.generateQR(req.params.id, req.user.id);
+      return successResponse(res, 200, 'QR code retrieved successfully', qrCode);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async decommission(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.decommission not yet implemented' });
+  /**
+   * Decommission transformer
+   * POST /api/transformers/:id/decommission
+   */
+  async decommission(req, res, next) {
+    try {
+      const transformer = await TransformerService.decommissionTransformer(
+        req.params.id,
+        req.body.reason,
+        req.user.id
+      );
+      return successResponse(res, 200, 'Transformer decommissioned successfully', transformer);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  async bulkCreate(req, res) {
-    return res.status(501).json({ success: false, message: 'TransformerController.bulkCreate not yet implemented' });
+  /**
+   * Bulk create transformers
+   * POST /api/transformers/bulk
+   */
+  async bulkCreate(req, res, next) {
+    try {
+      const transformersData = Array.isArray(req.body) ? req.body : req.body.transformers;
+      if (!transformersData || !Array.isArray(transformersData) || transformersData.length === 0) {
+        return errorResponse(res, 400, 'Request body must be a non-empty array of transformers');
+      }
+      const result = await TransformerService.bulkCreate(transformersData, req.user.id);
+      return successResponse(res, 207, 'Bulk create completed', result);
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

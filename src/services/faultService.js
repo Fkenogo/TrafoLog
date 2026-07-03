@@ -50,13 +50,13 @@ class FaultService extends BaseService {
         severity: data.severity
       });
 
-      // Send notifications for Critical and Complete Outage
+      // Send notifications for Critical and Complete Outage (non-fatal)
       if (['Critical', 'Complete Outage'].includes(data.severity)) {
-        await NotificationService.sendFaultAlert({
-          fault,
-          transformer,
-          priority: 'critical'
-        });
+        try {
+          await NotificationService.sendFaultAlert({ fault, transformer, priority: 'critical' });
+        } catch (notifError) {
+          logger.warn('FaultService: sendFaultAlert failed (non-fatal):', notifError.message);
+        }
       }
 
       return fault;
@@ -97,12 +97,12 @@ class FaultService extends BaseService {
       // Get transformer
       const transformer = await Transformer.findById(fault.transformer_id);
 
-      // Send notification
-      await NotificationService.sendAssignmentNotification({
-        fault: updated,
-        transformer,
-        assignedTo
-      });
+      // Send notification (non-fatal)
+      try {
+        await NotificationService.sendAssignmentNotification({ fault: updated, transformer, assignedTo });
+      } catch (notifError) {
+        logger.warn('FaultService: sendAssignmentNotification failed (non-fatal):', notifError.message);
+      }
 
       // Create timeline entry
       await this.createTimelineEntry(transformer, 'FAULT_ASSIGNED', userId, {
@@ -168,11 +168,12 @@ class FaultService extends BaseService {
         downtime_hours: downtimeHours
       });
 
-      // Send notification
-      await NotificationService.sendResolutionNotification({
-        fault: updated,
-        transformer
-      });
+      // Send notification (non-fatal)
+      try {
+        await NotificationService.sendResolutionNotification({ fault: updated, transformer });
+      } catch (notifError) {
+        logger.warn('FaultService: sendResolutionNotification failed (non-fatal):', notifError.message);
+      }
 
       return updated;
     } catch (error) {
@@ -237,13 +238,13 @@ class FaultService extends BaseService {
         userId
       );
 
-      // Send escalation notification
+      // Send escalation notification (non-fatal)
       const transformer = await Transformer.findById(fault.transformer_id);
-      await NotificationService.sendEscalationNotification({
-        fault: updated,
-        transformer,
-        reason
-      });
+      try {
+        await NotificationService.sendEscalationNotification({ fault: updated, transformer, reason });
+      } catch (notifError) {
+        logger.warn('FaultService: sendEscalationNotification failed (non-fatal):', notifError.message);
+      }
 
       return updated;
     } catch (error) {

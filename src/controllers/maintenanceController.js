@@ -203,9 +203,6 @@ class MaintenanceController {
     return successResponse(res, 200, 'Next maintenance scheduled successfully', maintenance);
   });
 
-  async getStats(req, res) {
-    return res.status(501).json({ success: false, message: 'MaintenanceController.getStats not yet implemented' });
-  }
 }
 
 module.exports = new MaintenanceController();

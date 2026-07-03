@@ -301,8 +301,12 @@ class AuthService extends BaseService {
       const resetToken = user.generatePasswordResetToken();
       await user.save({ validateBeforeSave: false });
 
-      // Send reset email
-      await this.sendPasswordResetEmail(user, resetToken);
+      // Send reset email — non-fatal; SMTP may not be configured in dev/test
+      try {
+        await this.sendPasswordResetEmail(user, resetToken);
+      } catch (emailError) {
+        logger.warn('Password reset email could not be sent:', emailError.message);
+      }
 
       // Log action
       await this.logAction({
@@ -552,6 +556,7 @@ class AuthService extends BaseService {
       const auditLog = new AuditLog({
         user_id: data.user_id,
         action: data.action,
+        action_category: data.action_category || 'AUTH',
         target_user_id: data.target_user_id,
         details: data.details,
         ip_address: data.ip_address,
@@ -560,8 +565,7 @@ class AuthService extends BaseService {
       });
       await auditLog.save();
     } catch (error) {
-      logger.error('Error logging action:', error);
-      // Don't throw, just log
+      logger.warn('AuditLog write failed (non-fatal):', error.message);
     }
   }
 

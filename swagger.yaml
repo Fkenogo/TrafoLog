@@ -2,35 +2,103 @@ openapi: 3.0.0
 info:
   title: kVAssetTracker API
   version: 1.0.0
-  description: Transformer Asset Management Platform API
+  description: Transformer Asset Management Platform — MVP API Contract
 
 servers:
   - url: http://localhost:3000/api
-    description: Development server
+    description: Local development
   - url: https://api.kVAssetTracker.com/api
-    description: Production server
+    description: Production
+
+security:
+  - bearerAuth: []
 
 tags:
   - name: Auth
-    description: Authentication endpoints
+    description: Authentication and session management
   - name: Transformers
-    description: Transformer management
+    description: Transformer asset management
   - name: Inspections
-    description: Inspection logging
+    description: Field inspections
   - name: Faults
-    description: Fault reporting and management
+    description: Fault reporting and lifecycle
+  - name: Maintenance
+    description: Maintenance records
+  - name: Territories
+    description: Territory reference data
+  - name: ServiceAreas
+    description: Service area reference data
+  - name: Feeders
+    description: Feeder reference data
+  - name: Districts
+    description: District reference data (read-only)
+  - name: Ratings
+    description: Transformer rating reference data
 
 paths:
-  /auth/login:
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────────
+
+  /auth/register:
     post:
       tags: [Auth]
-      summary: Login user
+      summary: Register a new user
+      security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required: [name, email, password, confirmPassword]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                confirmPassword:
+                  type: string
+                role:
+                  type: string
+                  enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      message:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
               properties:
                 email:
                   type: string
@@ -38,54 +106,275 @@ paths:
                 password:
                   type: string
       responses:
-        200:
-          description: Login successful
-        401:
-          description: Invalid credentials
+        '200':
+          description: Login successful — refreshToken set as HTTP-only cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: Browser clients should send the HTTP-only `refreshToken` cookie set at login. Non-browser clients may send `refreshToken` in the JSON request body. If both are missing, the API returns 401.
+      security: []
+      parameters:
+        - name: refreshToken
+          in: cookie
+          required: false
+          schema:
+            type: string
+          description: HTTP-only refresh token cookie set by login.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Optional body token for non-browser API clients.
+      responses:
+        '200':
+          description: New access token issued; refresh cookie is maintained or rotated as an HTTP-only cookie.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Logout from all devices
+      responses:
+        '200':
+          description: All sessions revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Auth]
+      summary: Update current user profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                preferences:
+                  type: object
+                push_tokens:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Profile updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Always returns success (email existence not revealed)
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using token from email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password, confirmPassword]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                confirmPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify email using token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Email verified
+
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Resend email verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Verification email sent
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password for authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword, confirmPassword]
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                confirmPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password changed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List active sessions
+      responses:
+        '200':
+          description: Active sessions
+
+  /auth/sessions/{sessionToken}:
+    delete:
+      tags: [Auth]
+      summary: Revoke a specific session
+      parameters:
+        - name: sessionToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session revoked
+
+  # ─── TRANSFORMERS ─────────────────────────────────────────────────────────────
 
   /transformers:
     get:
       tags: [Transformers]
-      summary: Get all transformers with filters
+      summary: List all transformers
       parameters:
-        - name: territory_id
-          in: query
-          schema:
-            type: string
-        - name: service_area_id
-          in: query
-          schema:
-            type: string
-        - name: network_voltage_kv
-          in: query
-          schema:
-            type: integer
-            enum: [11, 33]
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [Active, Faulty, Under Maintenance, Decommissioned]
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: integer, enum: [11, 33]}}
+        - {name: operational_status, in: query, schema: {type: string, enum: [Active, Faulty, 'Under Maintenance', Decommissioned]}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
       responses:
-        200:
-          description: List of transformers
-
-  /transformers:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [Transformers]
       summary: Create a new transformer
-      security:
-        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -93,26 +382,966 @@ paths:
             schema:
               $ref: '#/components/schemas/TransformerCreate'
       responses:
-        201:
-          description: Transformer created
-        400:
-          description: Validation error
-        403:
-          description: Insufficient permissions
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/search:
+    get:
+      tags: [Transformers]
+      summary: Search transformers (alias for GET /transformers with filters)
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: Free-text search}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: integer, enum: [11, 33]}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/stats:
+    get:
+      tags: [Transformers]
+      summary: Get transformer statistics
+      responses:
+        '200':
+          description: Transformer statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      by_status:
+                        type: object
+                      by_territory:
+                        type: object
+
+  /transformers/nearby:
+    get:
+      tags: [Transformers]
+      summary: Find transformers near a GPS location
+      parameters:
+        - {name: lat, in: query, required: true, schema: {type: number}, description: Latitude}
+        - {name: lng, in: query, required: true, schema: {type: number}, description: Longitude}
+        - {name: radius, in: query, schema: {type: number, default: 5}, description: Search radius in km}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          description: Missing lat or lng
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/territory/{territoryId}:
+    get:
+      tags: [Transformers]
+      summary: Get transformers by territory
+      parameters:
+        - {name: territoryId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Transformers and stats for the territory
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/service-area/{serviceAreaId}:
+    get:
+      tags: [Transformers]
+      summary: Get transformers by service area
+      parameters:
+        - {name: serviceAreaId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Transformers and stats for the service area
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/bulk:
+    post:
+      tags: [Transformers]
+      summary: Bulk create transformers (Super Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/TransformerCreate'
+                - type: object
+                  properties:
+                    transformers:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/TransformerCreate'
+      responses:
+        '207':
+          description: Multi-status — check success/failed arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: array
+                      failed:
+                        type: array
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transformers/{id}:
+    get:
+      tags: [Transformers]
+      summary: Get transformer by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Transformers]
+      summary: Update transformer (Territory Manager or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransformerUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Transformers]
+      summary: Soft-delete transformer (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Transformer deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transformers/{id}/verify:
+    post:
+      tags: [Transformers]
+      summary: Verify transformer (Engineer or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transformers/{id}/decommission:
+    post:
+      tags: [Transformers]
+      summary: Decommission transformer
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: ['End of Life', Damaged, Theft, Vandalism, Replaced, Other]
+                notes:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transformers/{id}/timeline:
+    get:
+      tags: [Transformers]
+      summary: Get transformer event timeline
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 50}}
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transformers/{id}/qr:
+    get:
+      tags: [Transformers]
+      summary: Get or generate QR code for transformer (idempotent)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: QR code data
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── INSPECTIONS ──────────────────────────────────────────────────────────────
+
+  /inspections:
+    get:
+      tags: [Inspections]
+      summary: List inspections
+      parameters:
+        - {name: transformer_id, in: query, schema: {type: string}}
+        - {name: inspected_by, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Inspections]
+      summary: Create inspection (Engineer or above)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /inspections/stats:
+    get:
+      tags: [Inspections]
+      summary: Get inspection statistics
+      responses:
+        '200':
+          description: Inspection stats
+
+  /inspections/overdue:
+    get:
+      tags: [Inspections]
+      summary: Get transformers with overdue inspections (Engineer or above)
+      description: Returns Transformer documents (not Inspection records) that have not been inspected recently.
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /inspections/transformer/{transformerId}:
+    get:
+      tags: [Inspections]
+      summary: Get inspections for a transformer
+      parameters:
+        - {name: transformerId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /inspections/latest/{transformerId}:
+    get:
+      tags: [Inspections]
+      summary: Get latest inspection for a transformer
+      parameters:
+        - {name: transformerId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspections/{id}:
+    get:
+      tags: [Inspections]
+      summary: Get inspection by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Inspections]
+      summary: Update inspection (Engineer or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [Inspections]
+      summary: Delete inspection (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Inspection deleted
+
+  # ─── FAULTS ───────────────────────────────────────────────────────────────────
+
+  /faults:
+    get:
+      tags: [Faults]
+      summary: List faults
+      parameters:
+        - {name: fault_status, in: query, schema: {type: string, enum: [Reported, Acknowledged, 'In Progress', Resolved, Closed]}}
+        - {name: severity, in: query, schema: {type: string, enum: [Minor, Major, Critical, 'Complete Outage']}}
+        - {name: transformer_id, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Faults]
+      summary: Report a new fault (Field Technician or above)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaultCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /faults/stats:
+    get:
+      tags: [Faults]
+      summary: Get fault statistics
+      responses:
+        '200':
+          description: Fault stats
+
+  /faults/open:
+    get:
+      tags: [Faults]
+      summary: Get open (active) faults
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /faults/assigned-to-me:
+    get:
+      tags: [Faults]
+      summary: Get faults assigned to the current user
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /faults/transformer/{transformerId}:
+    get:
+      tags: [Faults]
+      summary: Get faults for a transformer
+      parameters:
+        - {name: transformerId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /faults/{id}:
+    get:
+      tags: [Faults]
+      summary: Get fault by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Faults]
+      summary: Hard-delete fault (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Fault deleted
+
+  /faults/{id}/assign:
+    put:
+      tags: [Faults]
+      summary: Assign fault to a team member (Engineer or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assigned_to]
+              properties:
+                assigned_to:
+                  type: string
+                  description: User ID
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /faults/{id}/resolve:
+    put:
+      tags: [Faults]
+      summary: Mark fault as resolved (Field Technician or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolution_description:
+                  type: string
+                downtime_hours:
+                  type: number
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /faults/{id}/close:
+    put:
+      tags: [Faults]
+      summary: Close fault after review — fault must be Resolved first (Territory Manager or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '400':
+          description: Fault must be Resolved before closing
+
+  /faults/{id}/escalate:
+    put:
+      tags: [Faults]
+      summary: Escalate fault (Engineer or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                escalation_reason:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  # ─── MAINTENANCE ──────────────────────────────────────────────────────────────
+
+  /maintenance:
+    get:
+      tags: [Maintenance]
+      summary: List maintenance records
+      parameters:
+        - {name: transformer_id, in: query, schema: {type: string}}
+        - {name: maintenance_type, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginatedResponse'
+    post:
+      tags: [Maintenance]
+      summary: Create maintenance record (Field Technician or above)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transformer_id, maintenance_type, maintenance_date]
+              properties:
+                transformer_id:
+                  type: string
+                maintenance_type:
+                  type: string
+                  enum: ['Routine Service', 'Oil Change', 'Bushing Replacement', 'Winding Repair', 'Complete Overhaul', 'Emergency Repair', 'Preventive', 'Other']
+                maintenance_date:
+                  type: string
+                  format: date
+                technician_name:
+                  type: string
+                cost:
+                  type: number
+                notes:
+                  type: string
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+
+  /maintenance/stats:
+    get:
+      tags: [Maintenance]
+      summary: Get maintenance statistics
+      responses:
+        '200':
+          description: Maintenance stats
+
+  /maintenance/upcoming:
+    get:
+      tags: [Maintenance]
+      summary: Get upcoming scheduled maintenance (Engineer or above)
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /maintenance/transformer/{transformerId}:
+    get:
+      tags: [Maintenance]
+      summary: Get maintenance records for a transformer
+      parameters:
+        - {name: transformerId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /maintenance/{id}:
+    get:
+      tags: [Maintenance]
+      summary: Get maintenance record by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Maintenance]
+      summary: Update maintenance record (Engineer or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [Maintenance]
+      summary: Delete maintenance record (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Record deleted
+
+  # ─── TERRITORIES ──────────────────────────────────────────────────────────────
+
+  /territories:
+    get:
+      tags: [Territories]
+      summary: List all territories
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    post:
+      tags: [Territories]
+      summary: Create territory (Super Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code, region]
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+                region:
+                  type: string
+                  enum: [Central, Eastern, Northern, Western]
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+
+  /territories/{id}:
+    get:
+      tags: [Territories]
+      summary: Get territory by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Territories]
+      summary: Update territory (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [Territories]
+      summary: Hard-delete territory (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Territory deleted
+
+  # ─── SERVICE AREAS ────────────────────────────────────────────────────────────
+
+  /service-areas:
+    get:
+      tags: [ServiceAreas]
+      summary: List all service areas
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    post:
+      tags: [ServiceAreas]
+      summary: Create service area (Super Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, territory_id]
+              properties:
+                name:
+                  type: string
+                territory_id:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+
+  /service-areas/territory/{territoryId}:
+    get:
+      tags: [ServiceAreas]
+      summary: Get service areas by territory
+      parameters:
+        - {name: territoryId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /service-areas/{id}:
+    get:
+      tags: [ServiceAreas]
+      summary: Get service area by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [ServiceAreas]
+      summary: Update service area (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [ServiceAreas]
+      summary: Hard-delete service area (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Service area deleted
+
+  # ─── FEEDERS ──────────────────────────────────────────────────────────────────
+
+  /feeders:
+    get:
+      tags: [Feeders]
+      summary: List all feeders
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    post:
+      tags: [Feeders]
+      summary: Create feeder (Territory Manager or above)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, service_area_id, network_voltage_kv]
+              properties:
+                name:
+                  type: string
+                service_area_id:
+                  type: string
+                network_voltage_kv:
+                  type: number
+                  enum: [11, 33]
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+
+  /feeders/service-area/{serviceAreaId}:
+    get:
+      tags: [Feeders]
+      summary: Get feeders by service area
+      parameters:
+        - {name: serviceAreaId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /feeders/{id}:
+    get:
+      tags: [Feeders]
+      summary: Get feeder by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Feeders]
+      summary: Update feeder (Territory Manager or above)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [Feeders]
+      summary: Hard-delete feeder (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Feeder deleted
+
+  # ─── DISTRICTS ────────────────────────────────────────────────────────────────
+
+  /districts:
+    get:
+      tags: [Districts]
+      summary: List all districts
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /districts/region/{region}:
+    get:
+      tags: [Districts]
+      summary: Get districts by region
+      parameters:
+        - {name: region, in: path, required: true, schema: {type: string, enum: [Central, Eastern, Northern, Western]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /districts/{id}:
+    get:
+      tags: [Districts]
+      summary: Get district by ID
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── RATINGS ──────────────────────────────────────────────────────────────────
+
+  /ratings:
+    get:
+      tags: [Ratings]
+      summary: List all transformer ratings
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    post:
+      tags: [Ratings]
+      summary: Create rating (Super Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kva, network_voltage_kv]
+              properties:
+                kva:
+                  type: number
+                  enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]
+                network_voltage_kv:
+                  type: number
+                  enum: [11, 33]
+                phase_type:
+                  type: string
+                  enum: ['Single Phase', 'Three Phase']
+      responses:
+        '201':
+          $ref: '#/components/responses/ItemResponse'
+
+  /ratings/network/{networkVoltage}:
+    get:
+      tags: [Ratings]
+      summary: Get ratings by network voltage
+      parameters:
+        - {name: networkVoltage, in: path, required: true, schema: {type: integer, enum: [11, 33]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+
+  /ratings/{id}:
+    put:
+      tags: [Ratings]
+      summary: Update rating (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/ItemResponse'
+    delete:
+      tags: [Ratings]
+      summary: Hard-delete rating (Super Admin only)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Rating deleted
 
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: MongoDB ObjectId
+
   schemas:
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessToken:
+              type: string
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]
+        territory_id:
+          type: string
+        is_active:
+          type: boolean
+        is_email_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
     TransformerCreate:
       type: object
-      required:
-        - manufacturer
-        - kva_rating
-        - network_voltage_kv
-        - territory_id
-        - district_id
-        - site_name
-        - latitude
-        - longitude
+      required: [manufacturer, kva_rating, network_voltage_kv, territory_id, district_id, site_name, latitude, longitude]
       properties:
         manufacturer:
           type: string
@@ -126,16 +1355,16 @@ components:
           enum: [11, 33]
         voltage_secondary:
           type: string
-          enum: [415V, 240V, Other]
+          enum: ['415V', '240V', Other]
         phase_type:
           type: string
-          enum: [Single Phase, Three Phase]
+          enum: ['Single Phase', 'Three Phase']
         cooling_type:
           type: string
           enum: [ONAN, ONAF, OFAF]
         mounting_type:
           type: string
-          enum: [Pole Mounted, Plinth, Ground, Indoor Substation]
+          enum: ['Pole Mounted', Plinth, Ground, 'Indoor Substation']
         territory_id:
           type: string
         service_area_id:
@@ -143,12 +1372,6 @@ components:
         feeder_name:
           type: string
         district_id:
-          type: string
-        sub_county:
-          type: string
-        parish:
-          type: string
-        village:
           type: string
         site_name:
           type: string
@@ -161,6 +1384,160 @@ components:
           format: date
         installing_contractor:
           type: string
+
+    TransformerUpdate:
+      type: object
+      properties:
+        manufacturer:
+          type: string
+        operational_status:
+          type: string
+          enum: [Active, Faulty, 'Under Maintenance', Decommissioned]
+        site_name:
+          type: string
+        service_area_id:
+          type: string
+        feeder_name:
+          type: string
+
+    InspectionCreate:
+      type: object
+      required: [transformer_id]
+      properties:
+        transformer_id:
+          type: string
+        inspection_date:
+          type: string
+          format: date
+        overall_condition:
+          type: string
+          enum: [Good, Fair, Poor, Critical]
+        physical:
+          type: object
+        electrical:
+          type: object
+        oil:
+          type: object
+        recommendations:
+          type: string
+
+    FaultCreate:
+      type: object
+      required: [transformer_id, fault_type, severity, fault_description]
+      properties:
+        transformer_id:
+          type: string
+        fault_date:
+          type: string
+          format: date
+        fault_type:
+          type: string
+          enum: [Overload, 'Oil Leak', 'Bushing Failure', 'Winding Failure', 'Complete Failure', Fire, Theft, Vandalism, 'LV Side Fault', 'HV Side Fault', Other]
+        severity:
+          type: string
+          enum: [Minor, Major, Critical, 'Complete Outage']
+        fault_description:
+          type: string
+          minLength: 10
+        fault_source:
+          type: string
+          enum: ['Field Observation', 'Customer Report', Supervisor]
+        customers_affected:
+          type: integer
+          minimum: 0
+
+  responses:
+    PaginatedResponse:
+      description: Paginated list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              data:
+                type: array
+                items:
+                  type: object
+              pagination:
+                type: object
+                properties:
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+
+    ItemResponse:
+      description: Single item or list without pagination
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              data:
+                type: object
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Validation failed
+              errors:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: No token provided
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Resource not found
 
   securitySchemes:
     bearerAuth:

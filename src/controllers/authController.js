@@ -71,8 +71,7 @@ class AuthController {
       this.setTokenCookies(res, result);
       
       return successResponse(res, 200, 'Token refreshed successfully', {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken
+        accessToken: result.accessToken
       });
     } catch (error) {
       next(error);

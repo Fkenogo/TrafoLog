@@ -6,7 +6,7 @@ const Maintenance = require('../models/Maintenance');
 const Installation = require('../models/Installation');
 const BaseService = require('./baseService');
 const { generateAssetId } = require('../utils/idGenerator');
-const { generateQRCode } = require('../utils/qrGenerator');
+const qrGeneratorUtil = require('../utils/qrGenerator');
 const { ApiError } = require('../utils/error');
 const { logger } = require('../utils/logger');
 
@@ -40,7 +40,7 @@ class TransformerService extends BaseService {
         id: assetId,
         url: `${process.env.APP_URL}/assets/${assetId}`
       };
-      data.qr_code = await generateQRCode(qrData);
+      data.qr_code = await qrGeneratorUtil.generate(JSON.stringify(qrData));
 
       // Set GPS location
       if (data.latitude && data.longitude) {
@@ -460,6 +460,25 @@ class TransformerService extends BaseService {
     } catch (error) {
       logger.error('Error in TransformerService.getTransformersByTerritory:', error);
       throw new ApiError(500, 'Failed to get transformers by territory');
+    }
+  }
+
+  /**
+   * Get transformers by service area
+   */
+  async getTransformersByServiceArea(serviceAreaId) {
+    try {
+      const transformers = await this.model.find({
+        'location_operational.service_area_id': serviceAreaId,
+        is_deleted: false
+      }).populate('rating_id');
+
+      const stats = await this.getStatistics({ service_area_id: serviceAreaId });
+
+      return { transformers, stats };
+    } catch (error) {
+      logger.error('Error in TransformerService.getTransformersByServiceArea:', error);
+      throw new ApiError(500, 'Failed to get transformers by service area');
     }
   }
 

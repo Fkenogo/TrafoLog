@@ -6,7 +6,8 @@ const { validate } = require('../middleware/validation');
 const {
   createTransformerSchema,
   updateTransformerSchema,
-  searchTransformerSchema
+  searchTransformerSchema,
+  decommissionTransformerSchema
 } = require('../validators/transformerValidator');
 
 /**
@@ -168,6 +169,7 @@ router.post(
   '/:id/decommission',
   authenticate,
   authorize('Super Admin', 'Territory Manager', 'Engineer'),
+  validate(decommissionTransformerSchema),
   TransformerController.decommission
 );
 

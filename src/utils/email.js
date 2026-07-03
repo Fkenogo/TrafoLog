@@ -19,6 +19,11 @@ const initializeTransporter = () => {
 };
 
 const sendEmail = async ({ to, subject, html, text = null }) => {
+  if (!process.env.SMTP_HOST) {
+    logger.warn(`Email skipped (SMTP_HOST not configured): to="${to}", subject="${subject}"`);
+    return null;
+  }
+
   try {
     const transporter = initializeTransporter();
     
