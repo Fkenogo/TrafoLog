@@ -17,6 +17,48 @@ export const apiClient = axios.create({
   }
 });
 
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+let refreshPromise: Promise<string> | null = null;
+let hasNotifiedSessionExpired = false;
+
+const isAuthEndpoint = (url?: string) => {
+  if (!url) return false;
+  return url.includes('/auth/');
+};
+
+export const refreshAccessToken = async () => {
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post<ApiResponse<{ accessToken: string }>>('/auth/refresh', {})
+      .then((response) => {
+        const nextToken = response.data.data.accessToken;
+        tokenStore.setAccessToken(nextToken);
+        hasNotifiedSessionExpired = false;
+        return nextToken;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+const expireSession = () => {
+  tokenStore.clearAccessToken();
+  if (!hasNotifiedSessionExpired) {
+    hasNotifiedSessionExpired = true;
+    window.dispatchEvent(new Event(sessionEvents.expired));
+  }
+};
+
 apiClient.interceptors.request.use((config) => {
   const token = tokenStore.getAccessToken();
   if (token) {
@@ -31,16 +73,14 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as RetryRequestConfig | undefined;
     const status = error.response?.status;
 
-    if (status === 401 && originalRequest && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
+    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint(originalRequest.url)) {
       originalRequest._retry = true;
       try {
-        const refreshResponse = await apiClient.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', {});
-        tokenStore.setAccessToken(refreshResponse.data.data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.data.accessToken}`;
+        const nextToken = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${nextToken}`;
         return apiClient(originalRequest);
       } catch {
-        tokenStore.clearAccessToken();
-        window.dispatchEvent(new Event(sessionEvents.expired));
+        expireSession();
       }
     }
 
@@ -51,9 +91,21 @@ apiClient.interceptors.response.use(
 export const getApiErrorMessage = (error: unknown) => {
   if (axios.isAxiosError<ApiErrorPayload>(error)) {
     const validation = error.response?.data.errors?.[0]?.message;
-    return validation || error.response?.data.message || 'The request could not be completed.';
+    const message = validation || error.response?.data.message;
+    const unsafeBackendMessage = message && (
+      message.toLowerCase().includes('axios') ||
+      message.includes('Service.') ||
+      message.includes(' is not a function') ||
+      message.toLowerCase().includes('stack')
+    );
+    if (message && !unsafeBackendMessage) return message;
+    if (error.response?.status === 401) return 'Your session has expired. Please sign in again.';
+    if (error.response?.status === 403) return 'You do not have permission to complete this action.';
+    if (error.response?.status === 404) return 'The requested record could not be found.';
+    if (error.response?.status && error.response.status >= 500) return 'The server could not complete the request. Please try again.';
+    if (!error.response) return 'Cannot reach the server. Check your connection and try again.';
+    return 'The request could not be completed.';
   }
-  if (error instanceof Error) return error.message;
   return 'The request could not be completed.';
 };
 

@@ -10,6 +10,20 @@ const ExportJob = require('../models/ExportJob');
 const { ApiError } = require('../utils/error');
 const { logger } = require('../utils/logger');
 
+function formatGpsCoordinates(gps) {
+  const coordinates = gps?.coordinates;
+  if (!Array.isArray(coordinates) || coordinates.length < 2) {
+    return 'N/A';
+  }
+
+  const [longitude, latitude] = coordinates;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return 'N/A';
+  }
+
+  return `${latitude}, ${longitude}`;
+}
+
 class ReportingService {
   /**
    * Generate transformer report
@@ -42,7 +56,7 @@ class ReportingService {
    */
   async generateInspectionReport(filters, userId, format = 'json') {
     try {
-      const query = this.buildInspectionQuery(filters);
+      const query = await this.buildInspectionQuery(filters);
       const inspections = await Inspection.find(query)
         .populate('transformer_id')
         .populate('inspector_id', 'name email');
@@ -67,7 +81,7 @@ class ReportingService {
    */
   async generateFaultReport(filters, userId, format = 'json') {
     try {
-      const query = this.buildFaultQuery(filters);
+      const query = await this.buildFaultQuery(filters);
       const faults = await Fault.find(query)
         .populate('transformer_id')
         .populate('reported_by', 'name email')
@@ -94,7 +108,7 @@ class ReportingService {
    */
   async generateMaintenanceReport(filters, userId, format = 'json') {
     try {
-      const query = this.buildMaintenanceQuery(filters);
+      const query = await this.buildMaintenanceQuery(filters);
       const maintenance = await Maintenance.find(query)
         .populate('transformer_id')
         .populate('technician_id', 'name email');
@@ -188,7 +202,7 @@ class ReportingService {
         'Last Maintenance': t.last_maintenance_date || 'N/A',
         'Operational Status': t.operational_status,
         'Open Faults': faultMap[t._id.toString()] || 0,
-        'GPS Coordinates': t.gps ? `${t.gps.coordinates[1]}, ${t.gps.coordinates[0]}` : 'N/A'
+        'GPS Coordinates': formatGpsCoordinates(t.gps)
       }));
 
       const report = {
@@ -212,17 +226,25 @@ class ReportingService {
   buildTransformerQuery(filters) {
     const query = { is_deleted: false };
 
+    if (filters.startDate || filters.endDate) {
+      query.created_at = {};
+      if (filters.startDate) query.created_at.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.created_at.$lte = new Date(filters.endDate);
+    }
     if (filters.territory_id) {
       query['location_operational.territory_id'] = filters.territory_id;
     }
     if (filters.service_area_id) {
       query['location_operational.service_area_id'] = filters.service_area_id;
     }
+    if (filters.feeder_id) {
+      query['location_operational.feeder_id'] = filters.feeder_id;
+    }
     if (filters.network_voltage_kv) {
       query.network_voltage_kv = filters.network_voltage_kv;
     }
-    if (filters.status) {
-      query.operational_status = filters.status;
+    if (filters.operational_status || filters.status) {
+      query.operational_status = filters.operational_status || filters.status;
     }
     if (filters.district_id) {
       query['location_administrative.district_id'] = filters.district_id;
@@ -234,19 +256,61 @@ class ReportingService {
     return query;
   }
 
+  hasTransformerLocationFilters(filters) {
+    return Boolean(
+      filters.territory_id ||
+      filters.service_area_id ||
+      filters.feeder_id ||
+      filters.district_id ||
+      filters.network_voltage_kv ||
+      filters.kva_rating ||
+      filters.operational_status
+    );
+  }
+
+  async getTransformerIdsForReportFilters(filters) {
+    if (!this.hasTransformerLocationFilters(filters)) {
+      return null;
+    }
+
+    const query = this.buildTransformerQuery({
+      territory_id: filters.territory_id,
+      service_area_id: filters.service_area_id,
+      feeder_id: filters.feeder_id,
+      district_id: filters.district_id,
+      network_voltage_kv: filters.network_voltage_kv,
+      kva_rating: filters.kva_rating,
+      operational_status: filters.operational_status
+    });
+
+    const transformers = await Transformer.find(query).select('_id');
+    return transformers.map(transformer => transformer._id);
+  }
+
+  async applyTransformerFilters(query, filters) {
+    if (filters.transformer_id) {
+      query.transformer_id = filters.transformer_id;
+      return query;
+    }
+
+    const transformerIds = await this.getTransformerIdsForReportFilters(filters);
+    if (transformerIds) {
+      query.transformer_id = { $in: transformerIds };
+    }
+
+    return query;
+  }
+
   /**
    * Build inspection query from filters
    */
-  buildInspectionQuery(filters) {
+  async buildInspectionQuery(filters) {
     const query = {};
 
     if (filters.startDate || filters.endDate) {
       query.inspection_date = {};
-      if (filters.startDate) query.inspection_date.$gte = filters.startDate;
-      if (filters.endDate) query.inspection_date.$lte = filters.endDate;
-    }
-    if (filters.territory_id) {
-      // This would require joining with transformer
+      if (filters.startDate) query.inspection_date.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.inspection_date.$lte = new Date(filters.endDate);
     }
     if (filters.transformer_id) {
       query.transformer_id = filters.transformer_id;
@@ -255,19 +319,19 @@ class ReportingService {
       query['physical.overall_condition'] = filters.condition;
     }
 
-    return query;
+    return await this.applyTransformerFilters(query, filters);
   }
 
   /**
    * Build fault query from filters
    */
-  buildFaultQuery(filters) {
+  async buildFaultQuery(filters) {
     const query = {};
 
     if (filters.startDate || filters.endDate) {
       query.fault_date = {};
-      if (filters.startDate) query.fault_date.$gte = filters.startDate;
-      if (filters.endDate) query.fault_date.$lte = filters.endDate;
+      if (filters.startDate) query.fault_date.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.fault_date.$lte = new Date(filters.endDate);
     }
     if (filters.severity) {
       query.severity = filters.severity;
@@ -275,35 +339,29 @@ class ReportingService {
     if (filters.fault_type) {
       query.fault_type = filters.fault_type;
     }
-    if (filters.status) {
-      query.fault_status = filters.status;
-    }
-    if (filters.territory_id) {
-      // This would require joining with transformer
+    if (filters.fault_status || filters.status) {
+      query.fault_status = filters.fault_status || filters.status;
     }
 
-    return query;
+    return await this.applyTransformerFilters(query, filters);
   }
 
   /**
    * Build maintenance query from filters
    */
-  buildMaintenanceQuery(filters) {
+  async buildMaintenanceQuery(filters) {
     const query = {};
 
     if (filters.startDate || filters.endDate) {
       query.maintenance_date = {};
-      if (filters.startDate) query.maintenance_date.$gte = filters.startDate;
-      if (filters.endDate) query.maintenance_date.$lte = filters.endDate;
+      if (filters.startDate) query.maintenance_date.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.maintenance_date.$lte = new Date(filters.endDate);
     }
     if (filters.maintenance_type) {
       query.maintenance_type = filters.maintenance_type;
     }
-    if (filters.territory_id) {
-      // This would require joining with transformer
-    }
 
-    return query;
+    return await this.applyTransformerFilters(query, filters);
   }
 
   /**
@@ -359,10 +417,11 @@ class ReportingService {
       const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
       
       // Save export job
+      const exportDataType = reportType === 'asset-register' ? 'all' : reportType;
       const exportJob = new ExportJob({
         user_id: userId,
         export_type: 'excel',
-        data_type: reportType,
+        data_type: exportDataType,
         filters: report.filters,
         status: 'completed',
         file_url: `exports/${reportType}_${Date.now()}.xlsx`,
@@ -453,10 +512,11 @@ class ReportingService {
       const buffer = Buffer.concat(buffers);
       
       // Save export job
+      const exportDataType = reportType === 'asset-register' ? 'all' : reportType;
       const exportJob = new ExportJob({
         user_id: userId,
         export_type: 'pdf',
-        data_type: reportType,
+        data_type: exportDataType,
         filters: report.filters,
         status: 'completed',
         file_url: `exports/${reportType}_${Date.now()}.pdf`,

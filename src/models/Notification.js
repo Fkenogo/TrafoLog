@@ -117,7 +117,7 @@ notificationSchema.index({ user_id: 1, priority: 1, is_read: 1 });
 notificationSchema.index({ created_at: -1, is_read: 1 });
 
 // Pre-save middleware
-notificationSchema.pre('save', function(next) {
+notificationSchema.pre('save', function() {
   // Set expiry if not provided
   if (!this.expires_at) {
     const expiryMap = {

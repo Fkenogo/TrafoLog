@@ -145,6 +145,35 @@ describe('GET /api/inspections/latest/:transformerId', () => {
   });
 });
 
+describe('GET /api/inspections/:id', () => {
+  it('returns inspection detail for a valid inspection', async () => {
+    const res = await request(app.getApp())
+      .get(`/api/inspections/${inspectionId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('_id', String(inspectionId));
+    expect(res.body.data).toHaveProperty('transformer_id');
+  });
+
+  it('returns a clean 404 for a non-existent inspection', async () => {
+    const fakeId = '000000000000000000000003';
+    const res = await request(app.getApp())
+      .get(`/api/inspections/${fakeId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Inspection not found');
+  });
+
+  it('returns 401 without token', async () => {
+    const res = await request(app.getApp()).get(`/api/inspections/${inspectionId}`);
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('PUT /api/inspections/:id', () => {
   it('updates an inspection and returns the updated record', async () => {
     const res = await request(app.getApp())

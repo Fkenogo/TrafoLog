@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
   reportQuerySchema,
+  assetRegisterQuerySchema,
   exportOptionsSchema
 } = require('../validators/reportValidator');
 
@@ -69,7 +70,7 @@ router.get(
   '/asset-register',
   authenticate,
   authorize('Super Admin', 'Territory Manager', 'Viewer'),
-  validate(exportOptionsSchema, 'query'),
+  validate(assetRegisterQuerySchema, 'query'),
   ReportController.generateAssetRegister
 );
 

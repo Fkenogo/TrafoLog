@@ -1,6 +1,6 @@
 # API Frontend Readiness Map
 
-> Updated: 2026-07-02 (Session 10) | Tests: 88/88 | Backend: kVAssetTracker
+> Updated: 2026-07-06 (Phase 9D) | Tests: 175/175 | Backend: kVAssetTracker
 
 This document maps every backend route to its current implementation status and frontend integration guidance.
 
@@ -41,6 +41,45 @@ This document maps every backend route to its current implementation status and 
 - `refreshToken` is set as an HTTP-only cookie on login; `/refresh` accepts that cookie for browser clients and also accepts a JSON body token for non-browser clients
 - Refresh responses intentionally return only `accessToken` in JSON; refresh tokens remain in HTTP-only cookies
 - Email sending is non-fatal — registration/forgot-password succeeds even if SMTP is not configured
+
+---
+
+## User Management (`/api/users`)
+
+> Phase 8C implements safe backend User Management APIs for Super Admin users only. No frontend User Management UI, Admin Dashboard, backup, restore, or maintenance mode was added.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| GET | `/api/users` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| POST | `/api/users` | ✅ Ready | `{ data: { ...user } }` — 201 |
+| GET | `/api/users/:id` | ✅ Ready | `{ data: { ...user } }` |
+| PUT | `/api/users/:id` | ✅ Ready | `{ data: { ...user } }` — safe profile/admin-managed fields only |
+| POST | `/api/users/:id/role` | ✅ Ready | `{ data: { ...user } }` |
+| POST | `/api/users/:id/activate` | ✅ Ready | `{ data: { ...user, is_active: true } }` |
+| POST | `/api/users/:id/deactivate` | ✅ Ready | `{ data: { ...user, is_active: false } }` |
+
+**Access:** Super Admin only.
+
+**List filters:**
+
+| Filter | Notes |
+|--------|-------|
+| `page`, `limit` | Pagination |
+| `search` | Case-insensitive match against name/email |
+| `role` | Super Admin, Territory Manager, Engineer, Field Technician, Viewer |
+| `territory_id`, `service_area_id` | Location scoping filters |
+| `is_active` | Boolean active/deactivated filter |
+
+**Security notes:**
+
+- Responses remove password hashes, refresh tokens, reset tokens, verification tokens, push tokens, and two-factor secrets.
+- Create uses the `User` model save path so password hashing middleware runs.
+- `PUT /api/users/:id` does not update password, role, or activation status.
+- Role changes are handled only through `POST /api/users/:id/role`.
+- Self-demotion, self-deactivation, and last-active-Super-Admin lockout are blocked.
+- User create/update/role/activate/deactivate actions write `USER_MANAGEMENT` audit logs without password/token values.
+
+**Not ready in Phase 8C:** `DELETE /api/users/:id` and `GET /api/users/me/territory` remain outside the tested frontend-ready contract.
 
 ---
 
@@ -190,32 +229,173 @@ This document maps every backend route to its current implementation status and 
 
 ---
 
+## Reports (`/api/reports`)
+
+> Phase 7E wired report routes to `reportingService.js` through `reportService.js`. The JSON report endpoints below are authenticated, validated, tested, and frontend-ready. Report-route export helpers exist for backend compatibility, but frontend Reports UI should start with JSON endpoints only until export workflows are explicitly tested.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| GET | `/api/reports/transformers` | ✅ Ready | `{ data: { success, data, summary, filters, generated_at } }` |
+| GET | `/api/reports/inspections` | ✅ Ready | `{ data: { success, data, summary, filters, generated_at } }` |
+| GET | `/api/reports/faults` | ✅ Ready | `{ data: { success, data, summary, filters, generated_at } }` |
+| GET | `/api/reports/maintenance` | ✅ Ready | `{ data: { success, data, summary, filters, generated_at } }` |
+| GET | `/api/reports/asset-register` | ✅ Ready | `{ data: { success, data, summary, filters, generated_at } }` |
+
+**Supported query filters:**
+
+| Filter | Applies to |
+|--------|------------|
+| `startDate`, `endDate` | All five report endpoints |
+| `territory_id`, `service_area_id`, `feeder_id`, `district_id` | All five report endpoints |
+| `network_voltage_kv`, `kva_rating`, `operational_status` | Transformer and asset-register reports; also filters linked transformer records for inspection/fault/maintenance reports |
+| `transformer_id`, `condition` | Inspection report |
+| `fault_status`, `severity`, `fault_type` | Fault report |
+| `maintenance_type` | Maintenance report |
+| `format=json` | Recommended frontend format for all five ready endpoints |
+
+---
+
+## Exports (`/api/exports`)
+
+> Phase 7G wires safe direct exports for CSV and JSON only. These routes are backend-ready and tested. They do not write files, do not expose download jobs, and intentionally exclude raw GPS coordinates from export payloads.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| POST | `/api/exports/csv` | ✅ Ready | `text/csv` attachment response |
+| POST | `/api/exports/json` | ✅ Ready | `{ data: { metadata, rows } }` |
+
+**Request body:**
+
+```json
+{
+  "report_type": "transformers",
+  "filters": {
+    "startDate": "2026-01-01",
+    "endDate": "2026-12-31"
+  }
+}
+```
+
+**Supported `report_type` values:**
+
+- `transformers`
+- `inspections`
+- `faults`
+- `maintenance`
+- `asset-register`
+
+**Supported filters:** same validated filter set as JSON reports. Unsupported formats return `400 Validation failed`.
+
+**Not ready:** Excel, PDF, stored export jobs, and download endpoints remain out of frontend scope.
+
+---
+
+## Analytics (`/api/analytics`)
+
+> Phase 7H wires analytics endpoints to real operational data. Predictive analytics is intentionally a rule-based risk summary, not ML/AI prediction.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| GET | `/api/analytics/transformers` | ✅ Ready | `{ data: { summary, breakdowns, trends, risks, filters, generated_at } }` |
+| GET | `/api/analytics/faults` | ✅ Ready | `{ data: { summary, breakdowns, trends, risks, filters, generated_at } }` |
+| GET | `/api/analytics/maintenance` | ✅ Ready | `{ data: { summary, breakdowns, trends, risks, filters, generated_at } }` |
+| GET | `/api/analytics/predictive` | ✅ Ready | `{ data: { summary, breakdowns, trends, risks, filters, generated_at } }` |
+
+**Supported query filters:**
+
+| Filter | Applies to |
+|--------|------------|
+| `territory_id`, `service_area_id`, `feeder_id`, `district_id` | All four analytics endpoints through transformer scope |
+| `network_voltage_kv`, `kva_rating` | All four analytics endpoints through transformer scope |
+| `startDate`, `endDate` | Transformer `created_at`, fault date, maintenance date, and transformer scope for risk analytics |
+
+**Risk model:** `/api/analytics/predictive` uses explainable rules for open critical faults, overdue inspection flags, poor/critical inspection condition, repeated faults, and missing GPS. It does not claim ML prediction.
+
+---
+
+## Audit Logs (`/api/audit`)
+
+> Phase 8B wires the read-only Audit Log API for Super Admin users. Audit writes, deletion, retention workflows, export UI, User Management, and Admin Dashboard remain out of scope.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| GET | `/api/audit` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| GET | `/api/audit/user/:userId` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| GET | `/api/audit/transformers/:transformerId` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| GET | `/api/audit/actions` | ✅ Ready | `{ data: { categories: [...], actions: [...] } }` |
+
+**Access:** Super Admin only.
+
+**Supported query filters:**
+
+| Filter | Applies to |
+|--------|------------|
+| `page`, `limit` | Audit list, user audit list, transformer audit list |
+| `action`, `action_category` | Audit list, user audit list, transformer audit list |
+| `user_id` | General audit list |
+| `target_type`, `target_id` | General audit list and user audit list |
+| `startDate`, `endDate` | Audit list, user audit list, transformer audit list |
+| `is_sensitive` | Audit list, user audit list, transformer audit list |
+
+**Security notes:** Controller output is whitelisted. Password, token, refresh, reset-token, verification-token, and secret-like values in `old_values`, `new_values`, and `metadata` are redacted. Excessive request metadata such as raw IP address and user agent is not returned.
+
+**Route note:** The tested transformer audit path is plural: `GET /api/audit/transformers/:transformerId`.
+
+---
+
+## Admin (`/api/admin`)
+
+> Phase 8D implements safe read-only Admin backend endpoints for Super Admin users only. Phase 9B adds tested maintenance mode status/toggle support. Phase 9C adds tested backup creation and backup history metadata. Phase 9D adds the tested restore safety layer. Backup/restore frontend operations UI remains out of scope.
+
+| Method | Path | Status | Response shape |
+|--------|------|--------|----------------|
+| GET | `/api/admin/system-stats` | ✅ Ready | `{ data: { users, transformers, faults, inspections, maintenance, audit, generated_at } }` |
+| GET | `/api/admin/users` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| GET | `/api/admin/audit-logs` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` |
+| POST | `/api/admin/backup` | ✅ Ready | `{ data: { backup_id, filename, storage_key, status, checksum, compression, size_bytes, collections, manifest, ... } }` — requires maintenance mode |
+| GET | `/api/admin/backups` | ✅ Ready | `{ success, data: [...], pagination: { page, limit, total, pages } }` — metadata only, no download URLs |
+| POST | `/api/admin/restore/:backupId` | ✅ Ready | Dry run: `{ data: { dryRun: true, backup_id, verified, collections, plan, warnings } }`; restore: `{ data: { dryRun: false, backup_id, pre_restore_backup_id, restored_collections, restored_counts, completed_at } }` |
+| GET | `/api/admin/maintenance` | ✅ Ready | `{ data: { enabled, message, reason, enabled_by, enabled_at, disabled_by, disabled_at, updated_at } }` |
+| POST | `/api/admin/maintenance` | ✅ Ready | `{ data: { enabled, message, reason, enabled_by, enabled_at, disabled_by, disabled_at, updated_at } }` |
+
+**Access:** Super Admin only.
+
+**System stats fields:**
+
+| Field | Meaning |
+|-------|---------|
+| `users.total`, `users.active`, `users.by_role` | User counts |
+| `transformers.total`, `transformers.by_status` | Transformer counts |
+| `faults.open` | Open/assigned/in-progress faults |
+| `inspections.overdue` | Non-decommissioned transformers with overdue or missing inspections |
+| `maintenance.upcoming` | Maintenance records with next maintenance date in the next 30 days |
+| `audit.recent_activity_count` | Audit records created in the last 24 hours |
+| `generated_at` | ISO timestamp |
+
+**Admin users filters:** same as `GET /api/users`: `page`, `limit`, `search`, `role`, `territory_id`, `service_area_id`, `is_active`.
+
+**Admin audit filters:** same as `GET /api/audit`: `page`, `limit`, `action`, `action_category`, `user_id`, `target_type`, `target_id`, `startDate`, `endDate`, `is_sensitive`.
+
+**Security notes:** Admin users responses are sanitized using the tested User Management behavior. Admin audit responses are redacted using the tested Audit read behavior and do not expose raw sensitive metadata.
+
+**Maintenance mode behavior:** `POST /api/admin/maintenance` accepts `{ enabled, message?, reason? }`. When enabled, unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) return `503 Service Unavailable` for normal users. `GET`, `HEAD`, `OPTIONS`, login/refresh/logout, health/version, and the Super Admin maintenance endpoint remain available. MongoDB is the source of truth; Redis is used only as a best-effort cache. Maintenance enable/disable actions write `SYSTEM` audit logs.
+
+**Backup behavior:** `POST /api/admin/backup` requires maintenance mode and returns `409` with `Enable Maintenance Mode before creating a backup.` if maintenance is disabled. Backup artifacts include manifest metadata, collection inventory, document counts, SHA-256 checksum, gzip compression, storage metadata, app/schema version, and creator metadata. `GET /api/admin/backups` returns metadata only; no download URL is exposed. Backup actions write `SYSTEM_BACKUP_STARTED`, `SYSTEM_BACKUP_COMPLETED`, and `SYSTEM_BACKUP_FAILED` audit logs.
+
+**Restore behavior:** `POST /api/admin/restore/:backupId` requires maintenance mode, exact typed confirmation (`RESTORE BACKUP <backupId>`), a completed backup job, final artifact checksum verification, gzip decompression, manifest/payload validation, server-side collection allowlist, and no other running backup/restore operation. `dryRun: true` validates only and writes `SYSTEM_RESTORE_DRY_RUN`. `dryRun: false` creates a pre-restore backup before mutating data, restores only allowlisted requested collections, and writes `SYSTEM_RESTORE_STARTED`, `SYSTEM_RESTORE_COMPLETED`, or `SYSTEM_RESTORE_FAILED`. No raw file paths or download URLs are accepted from clients.
+
+---
+
 ## Stubs — Return 501 (Do Not Call From Frontend)
 
-### Users (`/api/users`) — 9 stubs
+### Users (`/api/users`) — 2 stubs
 
-All user management endpoints are stubbed. Frontend cannot manage users via API yet.
+Most Super Admin User Management endpoints are ready. The two routes below are not part of the Phase 8C tested frontend contract.
 
 | Endpoint | Stub |
 |----------|------|
-| GET `/api/users` | ⚠️ Stub |
-| POST `/api/users` | ⚠️ Stub |
-| GET `/api/users/:id` | ⚠️ Stub |
-| PUT `/api/users/:id` | ⚠️ Stub |
 | DELETE `/api/users/:id` | ⚠️ Stub |
-| PUT `/api/users/:id/activate` | ⚠️ Stub |
-| PUT `/api/users/:id/deactivate` | ⚠️ Stub |
-| PUT `/api/users/:id/role` | ⚠️ Stub |
-| GET `/api/users/my-territory` | ⚠️ Stub |
-
-### Audit Logs (`/api/audit`) — 4 stubs
-
-| Endpoint | Stub |
-|----------|------|
-| GET `/api/audit` | ⚠️ Stub |
-| GET `/api/audit/user/:userId` | ⚠️ Stub |
-| GET `/api/audit/transformer/:transformerId` | ⚠️ Stub |
-| GET `/api/audit/actions` | ⚠️ Stub |
+| GET `/api/users/me/territory` | ⚠️ Stub |
 
 ### QR (`/api/qr`) — 4 stubs
 
@@ -228,35 +408,13 @@ All user management endpoints are stubbed. Frontend cannot manage users via API 
 | GET `/api/qr/:id/download` | ⚠️ Stub |
 | POST `/api/qr/scan` | ⚠️ Stub |
 
-### Admin (`/api/admin`) — 7 stubs
+### Export Workflows Not Ready (`/api/exports`)
 
 | Endpoint | Stub |
 |----------|------|
-| GET `/api/admin/stats` | ⚠️ Stub |
-| GET `/api/admin/users` | ⚠️ Stub |
-| GET `/api/admin/audit-logs` | ⚠️ Stub |
-| POST `/api/admin/backup` | ⚠️ Stub |
-| POST `/api/admin/restore` | ⚠️ Stub |
-| GET `/api/admin/backups` | ⚠️ Stub |
-| POST `/api/admin/maintenance-mode` | ⚠️ Stub |
-
-### Analytics (`/api/analytics`) — 4 stubs
-
-| Endpoint | Stub |
-|----------|------|
-| GET `/api/analytics/transformers` | ⚠️ Stub |
-| GET `/api/analytics/faults` | ⚠️ Stub |
-| GET `/api/analytics/maintenance` | ⚠️ Stub |
-| GET `/api/analytics/predictive` | ⚠️ Stub |
-
-### Export (`/api/export`) — 4 stubs
-
-| Endpoint | Stub |
-|----------|------|
-| GET `/api/export/csv` | ⚠️ Stub |
-| GET `/api/export/excel` | ⚠️ Stub |
-| GET `/api/export/pdf` | ⚠️ Stub |
-| GET `/api/export/:id/download` | ⚠️ Stub |
+| POST `/api/exports/excel` | ⚠️ Not ready |
+| POST `/api/exports/pdf` | ⚠️ Not ready |
+| GET `/api/exports/:exportId` | ⚠️ Not ready |
 
 ### Geo (`/api/geo`) — 5 stubs
 
@@ -330,13 +488,11 @@ All user management endpoints are stubbed. Frontend cannot manage users via API 
 
 | Controller | Stubs |
 |-----------|-------|
-| userController | 9 |
-| adminController | 7 |
+| userController | 2 |
+| adminController | 0 |
 | geoController | 5 |
-| auditController | 4 |
 | qrController | 4 |
-| analyticsController | 4 |
-| exportController | 4 |
-| **Total** | **37** |
+| exportController | 3 |
+| **Total** | **14** |
 
-None of these stubs block the frontend MVP. Auth, transformers, inspections, faults, maintenance, and all reference data are fully implemented.
+None of these stubs block the frontend MVP. Auth, Super Admin user management, Admin read-only endpoints, backup/restore safety endpoints, transformers, inspections, faults, maintenance, reference data, notifications, transformer QR display, asset map data, JSON reports, tested CSV/JSON exports, backend analytics, and audit log read APIs are implemented.

@@ -164,3 +164,19 @@ Returned the backend API root response.
 - Add dashboard-specific aggregate endpoints only if existing list/stats endpoints become too expensive.
 - Add Playwright smoke tests for login, protected redirect, dashboard load, and API error states.
 - Decide whether access tokens should remain in localStorage or move to memory-only storage with cookie-backed reload.
+
+## Post-Foundation Frontend Updates
+
+### 2026-07-03 — Sprint 5C Transformer Registry
+
+- `/transformers` now has a full read-only registry list experience.
+- Added live search, filters, backend pagination, current-page sort controls, summary cards, status/condition badges, empty/error/loading states, and row click-through to `/transformers/:id`.
+- Uses only documented ready transformer endpoints: `GET /api/transformers/search` and `GET /api/transformers/stats`.
+- Report: `docs/superpowers/reports/2026-07-03-sprint-5c-transformer-registry.md`
+
+### 2026-07-03 — Sprint 5D Transformer Detail
+
+- `/transformers/:id` now has a full read-only asset detail experience.
+- Added header, status strip, summary cards, local tabs, overview/specification/location sections, linked fault/inspection/maintenance/timeline data, QR display, and tab-level loading/error/empty states.
+- Uses only documented ready endpoints for transformer detail, timeline, QR, transformer faults, transformer inspections, latest inspection, and transformer maintenance.
+- Report: `docs/superpowers/reports/2026-07-03-sprint-5d-transformer-detail.md`

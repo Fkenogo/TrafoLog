@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const AnalyticsController = require('../controllers/analyticsController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validation');
+const { analyticsQuerySchema } = require('../validators/analyticsValidator');
 
 /**
  * @route GET /api/analytics/transformers
@@ -12,6 +14,7 @@ router.get(
   '/transformers',
   authenticate,
   authorize('Super Admin', 'Territory Manager'),
+  validate(analyticsQuerySchema, 'query'),
   AnalyticsController.getTransformerAnalytics
 );
 
@@ -24,6 +27,7 @@ router.get(
   '/faults',
   authenticate,
   authorize('Super Admin', 'Territory Manager'),
+  validate(analyticsQuerySchema, 'query'),
   AnalyticsController.getFaultAnalytics
 );
 
@@ -36,6 +40,7 @@ router.get(
   '/maintenance',
   authenticate,
   authorize('Super Admin', 'Territory Manager'),
+  validate(analyticsQuerySchema, 'query'),
   AnalyticsController.getMaintenanceAnalytics
 );
 
@@ -48,6 +53,7 @@ router.get(
   '/predictive',
   authenticate,
   authorize('Super Admin', 'Territory Manager'),
+  validate(analyticsQuerySchema, 'query'),
   AnalyticsController.getPredictiveAnalytics
 );
 

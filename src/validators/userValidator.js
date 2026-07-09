@@ -108,31 +108,11 @@ const updateUserSchema = Joi.object({
       'string.pattern.base': 'Please provide a valid phone number (10-15 digits)'
     }),
   
-  role: Joi.string()
-    .valid('Super Admin', 'Territory Manager', 'Engineer', 'Field Technician', 'Viewer')
-    .messages({
-      'any.only': 'Invalid role'
-    }),
-  
   territory_id: Joi.string()
-    .when('role', {
-      is: Joi.string().valid('Territory Manager', 'Engineer', 'Field Technician'),
-      then: Joi.required(),
-      otherwise: Joi.optional()
-    })
-    .messages({
-      'any.required': 'Territory is required for this role'
-    }),
+    .optional(),
   
   service_area_id: Joi.string()
-    .when('role', {
-      is: Joi.string().valid('Engineer', 'Field Technician'),
-      then: Joi.required(),
-      otherwise: Joi.optional()
-    })
-    .messages({
-      'any.required': 'Service area is required for this role'
-    }),
+    .optional(),
   
   preferences: Joi.object({
     theme: Joi.string()

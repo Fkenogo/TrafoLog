@@ -6,6 +6,7 @@ const { validate } = require('../middleware/validation');
 const { uploadPhotos } = require('../middleware/fileUpload');
 const {
   createFaultSchema,
+  updateFaultSchema,
   resolveFaultSchema,
   assignFaultSchema,
   faultQuerySchema
@@ -90,6 +91,19 @@ router.post(
   uploadPhotos.array('photos', 10),
   validate(createFaultSchema),
   FaultController.create
+);
+
+/**
+ * @route PUT /api/faults/:id
+ * @desc Update editable fault fields
+ * @access Private
+ */
+router.put(
+  '/:id',
+  authenticate,
+  authorize('Super Admin', 'Territory Manager', 'Engineer'),
+  validate(updateFaultSchema),
+  FaultController.update
 );
 
 /**

@@ -17,8 +17,8 @@ const redis = require('./config/redis');
 
 // Middleware
 const { errorHandler } = require('./middleware/errorHandler');
-const { authenticate } = require('./middleware/auth');
 const rateLimiter = require('./middleware/rateLimiter');
+const maintenanceModeMiddleware = require('./middleware/maintenanceMode');
 
 // Routes
 const routes = require('./routes');
@@ -35,12 +35,15 @@ class App {
     this.app = express();
     this.server = createServer(this.app);
     this.port = process.env.PORT || 3000;
+    this.isTestRuntime = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
     
     this.setupMiddleware();
     this.setupSwagger();
     this.setupRoutes();
-    this.setupWebSocket();
-    this.setupJobs();
+    if (!this.isTestRuntime) {
+      this.setupWebSocket();
+      this.setupJobs();
+    }
     this.setupErrorHandling();
   }
   
@@ -215,6 +218,8 @@ class App {
    * Setup all routes
    */
   setupRoutes() {
+    this.app.use('/api', maintenanceModeMiddleware);
+
     // routes/index.js already mounts all sub-routes internally and exports one router
     this.app.use('/api', routes);
 
@@ -274,6 +279,10 @@ class App {
   setupErrorHandling() {
     // Global error handler
     this.app.use(errorHandler);
+
+    if (this.isTestRuntime) {
+      return;
+    }
     
     // Uncaught exception handler
     process.on('uncaughtException', (error) => {

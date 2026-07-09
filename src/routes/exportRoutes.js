@@ -3,7 +3,7 @@ const router = express.Router();
 const ExportController = require('../controllers/exportController');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { exportOptionsSchema } = require('../validators/exportValidator');
+const { exportFormatParamSchema, exportOptionsSchema } = require('../validators/exportValidator');
 
 /**
  * @route POST /api/exports/excel
@@ -42,6 +42,33 @@ router.post(
   authorize('Super Admin', 'Territory Manager', 'Viewer'),
   validate(exportOptionsSchema),
   ExportController.exportToCSV
+);
+
+/**
+ * @route POST /api/exports/json
+ * @desc Export data to JSON
+ * @access Private
+ */
+router.post(
+  '/json',
+  authenticate,
+  authorize('Super Admin', 'Territory Manager', 'Viewer'),
+  validate(exportOptionsSchema),
+  ExportController.exportToJSON
+);
+
+/**
+ * @route POST /api/exports/:format
+ * @desc Validate unsupported export format requests
+ * @access Private
+ */
+router.post(
+  '/:format',
+  authenticate,
+  authorize('Super Admin', 'Territory Manager', 'Viewer'),
+  validate(exportFormatParamSchema, 'params'),
+  validate(exportOptionsSchema),
+  ExportController.exportToJSON
 );
 
 /**

@@ -47,7 +47,7 @@ class TransformerController {
    */
   async getById(req, res, next) {
     try {
-      const transformer = await TransformerService.getTransformerById(req.params.id);
+      const transformer = await TransformerService.getTransformerWithDetails(req.params.id);
       return successResponse(res, 200, 'Transformer retrieved successfully', transformer);
     } catch (error) {
       next(error);

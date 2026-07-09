@@ -22,6 +22,8 @@ const District = require('./District');
 const TransformerRating = require('./TransformerRating');
 const ExportJob = require('./ExportJob');
 const SyncQueue = require('./SyncQueue');
+const MaintenanceMode = require('./MaintenanceMode');
+const BackupJob = require('./BackupJob');
 
 // 1. Export all models as the primary object
 module.exports = {
@@ -45,7 +47,9 @@ module.exports = {
   District,
   TransformerRating,
   ExportJob,
-  SyncQueue
+  SyncQueue,
+  MaintenanceMode,
+  BackupJob
 };
 
 // 2. Export mongoose instance for connection management

@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const AdminController = require('../controllers/adminController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validation');
+const { userQuerySchema } = require('../validators/userValidator');
+const { auditQuerySchema } = require('../validators/auditValidator');
+const { maintenanceModeSchema, backupRequestSchema, backupQuerySchema, restoreRequestSchema } = require('../validators/adminValidator');
 
 /**
  * @route GET /api/admin/audit-logs
@@ -12,6 +16,7 @@ router.get(
   '/audit-logs',
   authenticate,
   authorize('Super Admin'),
+  validate(auditQuerySchema, 'query'),
   AdminController.getAuditLogs
 );
 
@@ -36,6 +41,7 @@ router.post(
   '/backup',
   authenticate,
   authorize('Super Admin'),
+  validate(backupRequestSchema),
   AdminController.triggerBackup
 );
 
@@ -48,6 +54,7 @@ router.get(
   '/backups',
   authenticate,
   authorize('Super Admin'),
+  validate(backupQuerySchema, 'query'),
   AdminController.getBackupHistory
 );
 
@@ -60,6 +67,7 @@ router.post(
   '/restore/:backupId',
   authenticate,
   authorize('Super Admin'),
+  validate(restoreRequestSchema),
   AdminController.restoreFromBackup
 );
 
@@ -72,7 +80,20 @@ router.post(
   '/maintenance',
   authenticate,
   authorize('Super Admin'),
+  validate(maintenanceModeSchema),
   AdminController.toggleMaintenanceMode
+);
+
+/**
+ * @route GET /api/admin/maintenance
+ * @desc Get maintenance mode status
+ * @access Private (Admin)
+ */
+router.get(
+  '/maintenance',
+  authenticate,
+  authorize('Super Admin'),
+  AdminController.getMaintenanceMode
 );
 
 /**
@@ -84,6 +105,7 @@ router.get(
   '/users',
   authenticate,
   authorize('Super Admin'),
+  validate(userQuerySchema, 'query'),
   AdminController.getAllUsers
 );
 

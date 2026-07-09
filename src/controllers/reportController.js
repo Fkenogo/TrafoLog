@@ -17,16 +17,21 @@ class ReportController {
       endDate,
       territory_id,
       service_area_id,
+      feeder_id,
       network_voltage_kv,
-      status,
+      kva_rating,
+      operational_status,
       district_id
     } = req.query;
 
     const filters = {
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      network_voltage_kv: network_voltage_kv ? parseInt(network_voltage_kv) : undefined,
-      status,
+      startDate,
+      endDate,
+      service_area_id,
+      feeder_id,
+      network_voltage_kv,
+      kva_rating,
+      operational_status,
       district_id
     };
 
@@ -35,10 +40,6 @@ class ReportController {
       filters.territory_id = territoryId;
     } else if (territory_id) {
       filters.territory_id = territory_id;
-    }
-
-    if (service_area_id) {
-      filters.service_area_id = service_area_id;
     }
 
     const report = await ReportService.generateTransformerReport(
@@ -68,13 +69,18 @@ class ReportController {
       endDate,
       territory_id,
       service_area_id,
+      feeder_id,
+      district_id,
       transformer_id,
       condition
     } = req.query;
 
     const filters = {
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      startDate,
+      endDate,
+      service_area_id,
+      feeder_id,
+      district_id,
       transformer_id,
       condition
     };
@@ -83,10 +89,6 @@ class ReportController {
       filters.territory_id = territoryId;
     } else if (territory_id) {
       filters.territory_id = territory_id;
-    }
-
-    if (service_area_id) {
-      filters.service_area_id = service_area_id;
     }
 
     const report = await ReportService.generateInspectionReport(
@@ -116,27 +118,28 @@ class ReportController {
       endDate,
       territory_id,
       service_area_id,
+      feeder_id,
+      district_id,
       severity,
       fault_type,
-      status
+      fault_status
     } = req.query;
 
     const filters = {
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      startDate,
+      endDate,
+      service_area_id,
+      feeder_id,
+      district_id,
       severity,
       fault_type,
-      status
+      fault_status
     };
 
     if (userRole !== 'Super Admin' && territoryId) {
       filters.territory_id = territoryId;
     } else if (territory_id) {
       filters.territory_id = territory_id;
-    }
-
-    if (service_area_id) {
-      filters.service_area_id = service_area_id;
     }
 
     const report = await ReportService.generateFaultReport(
@@ -166,12 +169,17 @@ class ReportController {
       endDate,
       territory_id,
       service_area_id,
+      feeder_id,
+      district_id,
       maintenance_type
     } = req.query;
 
     const filters = {
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      startDate,
+      endDate,
+      service_area_id,
+      feeder_id,
+      district_id,
       maintenance_type
     };
 
@@ -179,10 +187,6 @@ class ReportController {
       filters.territory_id = territoryId;
     } else if (territory_id) {
       filters.territory_id = territory_id;
-    }
-
-    if (service_area_id) {
-      filters.service_area_id = service_area_id;
     }
 
     const report = await ReportService.generateMaintenanceReport(
@@ -206,9 +210,29 @@ class ReportController {
     const userId = req.user.id;
     const userRole = req.user.role;
     const territoryId = req.user.territory_id;
-    const { format = 'excel', territory_id } = req.query;
+    const {
+      format = 'json',
+      territory_id,
+      service_area_id,
+      feeder_id,
+      district_id,
+      network_voltage_kv,
+      kva_rating,
+      operational_status,
+      startDate,
+      endDate
+    } = req.query;
 
-    const filters = {};
+    const filters = {
+      service_area_id,
+      feeder_id,
+      district_id,
+      network_voltage_kv,
+      kva_rating,
+      operational_status,
+      startDate,
+      endDate
+    };
     if (userRole !== 'Super Admin' && territoryId) {
       filters.territory_id = territoryId;
     } else if (territory_id) {
@@ -221,7 +245,7 @@ class ReportController {
       format
     );
 
-    if (format === 'pdf') {
+    if (format === 'pdf' || format === 'excel') {
       return res.send(report);
     }
 

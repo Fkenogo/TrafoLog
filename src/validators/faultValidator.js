@@ -10,6 +10,9 @@ const createFaultSchema = Joi.object({
       'any.required': 'Transformer ID is required',
       'string.empty': 'Transformer ID cannot be empty'
     }),
+
+  inspection_id: Joi.string()
+    .optional(),
   
   fault_date: Joi.date()
     .default(Date.now)

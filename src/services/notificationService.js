@@ -3,6 +3,7 @@ const User = require('../models/User');
 const BaseService = require('./baseService');
 const { sendEmail } = require('../utils/email');
 const { sendSMS } = require('../utils/sms');
+const { ApiError } = require('../utils/error');
 const { logger } = require('../utils/logger');
 
 // WebSocket manager reference (will be set in app.js)
@@ -236,11 +237,15 @@ class NotificationService extends BaseService {
       );
 
       // Send email
-      await sendEmail({
-        to: assignedTo.email,
-        subject: `📌 Fault Assigned - ${fault.fault_type}`,
-        html: this.generateAssignmentEmailHTML(fault, transformer, assignedTo)
-      });
+      try {
+        await sendEmail({
+          to: assignedTo.email,
+          subject: `📌 Fault Assigned - ${fault.fault_type}`,
+          html: this.generateAssignmentEmailHTML(fault, transformer, assignedTo)
+        });
+      } catch (emailError) {
+        logger.warn('Assignment email delivery failed after in-app notification was created (non-fatal):', emailError.message);
+      }
 
       return { success: true };
     } catch (error) {
@@ -628,7 +633,7 @@ class NotificationService extends BaseService {
         throw new ApiError(404, 'Notification not found');
       }
 
-      await notification.remove();
+      await notification.deleteOne();
       return { success: true };
     } catch (error) {
       if (error instanceof ApiError) throw error;

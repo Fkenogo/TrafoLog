@@ -1,8 +1,8 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { authApi, LoginRequest } from '../api/authApi';
-import { getApiErrorMessage } from '../api/http';
 import { User } from '../types/api';
 import { sessionEvents, tokenStore } from '../utils/session';
 
@@ -20,6 +20,7 @@ export const AuthContext = createContext<AuthContextValue | undefined>(undefined
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(() => tokenStore.getAccessToken());
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.clearAccessToken();
     setAccessToken(null);
     setUser(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
   const reloadUser = useCallback(async () => {
     const currentUser = await authApi.me();
@@ -40,6 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       let token = tokenStore.getAccessToken();
       if (!token) {
+        if (window.location.pathname === '/login') {
+          clearSession();
+          return;
+        }
         const refreshed = await authApi.refresh();
         token = refreshed.accessToken;
         tokenStore.setAccessToken(token);
@@ -69,26 +75,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (payload: LoginRequest) => {
-      try {
-        const result = await authApi.login(payload);
-        tokenStore.setAccessToken(result.accessToken);
-        setAccessToken(result.accessToken);
-        setUser(result.user);
-        toast.success('Signed in');
-        navigate('/dashboard', { replace: true });
-      } catch (error) {
-        toast.error(getApiErrorMessage(error));
-        throw error;
-      }
+      const result = await authApi.login(payload);
+      queryClient.clear();
+      tokenStore.setAccessToken(result.accessToken);
+      setAccessToken(result.accessToken);
+      setUser(result.user);
+      toast.success('Signed in');
+      navigate('/dashboard', { replace: true });
     },
-    [navigate]
+    [navigate, queryClient]
   );
 
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } catch {
-      // A failed logout should not trap the user in a local session.
+      try {
+        await authApi.refresh();
+        await authApi.logout();
+      } catch {
+        // A failed logout should not trap the user in a local session.
+      }
     } finally {
       clearSession();
       toast.success('Signed out');

@@ -1,4 +1,4 @@
-import { apiClient } from './http';
+import { apiClient, refreshAccessToken } from './http';
 import { ApiResponse, AuthPayload, User } from '../types/api';
 
 export interface LoginRequest {
@@ -16,8 +16,8 @@ export const authApi = {
     return response.data.data;
   },
   async refresh() {
-    const response = await apiClient.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', {});
-    return response.data.data;
+    const accessToken = await refreshAccessToken();
+    return { accessToken };
   },
   async logout() {
     await apiClient.post('/auth/logout', {});

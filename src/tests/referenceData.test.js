@@ -3,6 +3,8 @@ const app = require('../app');
 const database = require('../config/database');
 const redis = require('../config/redis');
 
+jest.setTimeout(30000);
+
 const ADMIN_EMAIL = 'admin.refdata@example.com';
 const ADMIN_PASSWORD = 'Admin@1234';
 

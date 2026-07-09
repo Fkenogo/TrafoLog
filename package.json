@@ -14,7 +14,7 @@
     "create-indexes:list": "node src/scripts/createIndexes.js list",
     "create-indexes:validate": "node src/scripts/createIndexes.js validate",
     "create-indexes:repair": "node src/scripts/createIndexes.js repair",
-    "test": "jest --testPathPatterns=src/tests --forceExit"
+    "test": "jest --testPathPatterns=src/tests --runInBand --forceExit"
   },
   "keywords": [],
   "author": "",

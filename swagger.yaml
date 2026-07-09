@@ -16,6 +16,10 @@ security:
 tags:
   - name: Auth
     description: Authentication and session management
+  - name: Users
+    description: Super Admin user management
+  - name: Admin
+    description: Super Admin read-only administration
   - name: Transformers
     description: Transformer asset management
   - name: Inspections
@@ -34,6 +38,14 @@ tags:
     description: District reference data (read-only)
   - name: Ratings
     description: Transformer rating reference data
+  - name: Reports
+    description: JSON operational reports
+  - name: Exports
+    description: Direct CSV and JSON exports
+  - name: Analytics
+    description: Operational analytics and rule-based risk summaries
+  - name: Audit
+    description: Super Admin audit log read APIs
 
 paths:
 
@@ -353,6 +365,335 @@ paths:
       responses:
         '200':
           description: Session revoked
+
+  # ─── USERS ───────────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: Super Admin only. Returns sanitized user records with pagination.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: search, in: query, schema: {type: string}}
+        - {name: role, in: query, schema: {type: string, enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: is_active, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/UserListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Super Admin only. Password is hashed by the User model and never returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      description: Super Admin only. Returns a sanitized user record.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Users]
+      summary: Update safe user fields
+      description: Super Admin only. Does not update password, role, or activation status.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/role:
+    post:
+      tags: [Users]
+      summary: Change user role
+      description: Super Admin only. Blocks self-demotion and last active Super Admin lockout.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleChange'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /users/{id}/activate:
+    post:
+      tags: [Users]
+      summary: Activate user
+      description: Super Admin only.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /users/{id}/deactivate:
+    post:
+      tags: [Users]
+      summary: Deactivate user
+      description: Super Admin only. Blocks self-deactivation and last active Super Admin lockout.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDeactivate'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  # ─── ADMIN ───────────────────────────────────────────────────────────────────
+
+  /admin/system-stats:
+    get:
+      tags: [Admin]
+      summary: Get read-only system statistics
+      description: Super Admin only. Returns operational/admin summary counts; this endpoint performs no mutations.
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users through the Admin route
+      description: Super Admin only alias over the tested User Management list behavior. Returns sanitized users.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: search, in: query, schema: {type: string}}
+        - {name: role, in: query, schema: {type: string, enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: is_active, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/UserListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: List audit logs through the Admin route
+      description: Super Admin only alias over the tested Audit Log read behavior. Returns redacted audit records.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: action_category, in: query, schema: {type: string, enum: [AUTH, USER_MANAGEMENT, TRANSFORMER_MANAGEMENT, INSPECTION, FAULT_MANAGEMENT, MAINTENANCE, INSTALLATION, REPORTING, IMPORT, EXPORT, SYSTEM]}}
+        - {name: user_id, in: query, schema: {type: string}}
+        - {name: target_type, in: query, schema: {type: string, enum: [User, Transformer, Inspection, Fault, Maintenance, Installation, Report]}}
+        - {name: target_id, in: query, schema: {type: string}}
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: is_sensitive, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /admin/backup:
+    post:
+      tags: [Admin]
+      summary: Create a system backup
+      description: Super Admin only. Requires maintenance mode to be enabled before creating a backup. Restore is not implemented by this endpoint.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/BackupResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+        '409':
+          description: Maintenance mode must be enabled first
+        '500':
+          $ref: '#/components/responses/BackupResponse'
+
+  /admin/backups:
+    get:
+      tags: [Admin]
+      summary: List backup history
+      description: Super Admin only. Returns backup metadata only; download URLs are intentionally not exposed.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: status, in: query, schema: {type: string, enum: [QUEUED, RUNNING, COMPLETED, FAILED]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/BackupListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /admin/restore/{backupId}:
+    post:
+      tags: [Admin]
+      summary: Validate or restore from a backup
+      description: Super Admin only. Requires maintenance mode, exact typed confirmation, verified artifact checksum, valid manifest, server-side collection allowlist, and active-operation lock. Dry run validates only and does not mutate data.
+      parameters:
+        - name: backupId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server-generated backup ID, for example BKP-...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/RestoreResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+        '404':
+          description: Backup or artifact not found
+        '409':
+          description: Maintenance mode disabled or another operation is running
+
+  /admin/maintenance:
+    get:
+      tags: [Admin]
+      summary: Get maintenance mode status
+      description: Super Admin only. Returns the durable maintenance mode state.
+      responses:
+        '200':
+          $ref: '#/components/responses/MaintenanceModeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+    post:
+      tags: [Admin]
+      summary: Enable or disable maintenance mode
+      description: Super Admin only. Persists maintenance state and blocks non-admin unsafe writes while enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceModeUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/MaintenanceModeResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
 
   # ─── TRANSFORMERS ─────────────────────────────────────────────────────────────
 
@@ -1283,6 +1624,340 @@ paths:
         '200':
           description: Rating deleted
 
+  # ─── ANALYTICS ────────────────────────────────────────────────────────────────
+
+  /analytics/transformers:
+    get:
+      tags: [Analytics]
+      summary: Get transformer analytics
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/faults:
+    get:
+      tags: [Analytics]
+      summary: Get fault analytics
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/maintenance:
+    get:
+      tags: [Analytics]
+      summary: Get maintenance analytics
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/predictive:
+    get:
+      tags: [Analytics]
+      summary: Get rule-based transformer risk analytics
+      description: Returns explainable operational risk indicators. This endpoint does not perform ML or AI prediction.
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
+
+  /audit:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      description: Super Admin only. Returns redacted audit log records with pagination.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: action_category, in: query, schema: {type: string, enum: [AUTH, USER_MANAGEMENT, TRANSFORMER_MANAGEMENT, INSPECTION, FAULT_MANAGEMENT, MAINTENANCE, INSTALLATION, REPORTING, IMPORT, EXPORT, SYSTEM]}}
+        - {name: user_id, in: query, schema: {type: string}}
+        - {name: target_type, in: query, schema: {type: string, enum: [User, Transformer, Inspection, Fault, Maintenance, Installation, Report]}}
+        - {name: target_id, in: query, schema: {type: string}}
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: is_sensitive, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /audit/user/{userId}:
+    get:
+      tags: [Audit]
+      summary: List audit logs for a user
+      description: Super Admin only. Returns audit records where the actor user matches `userId`.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: action_category, in: query, schema: {type: string, enum: [AUTH, USER_MANAGEMENT, TRANSFORMER_MANAGEMENT, INSPECTION, FAULT_MANAGEMENT, MAINTENANCE, INSTALLATION, REPORTING, IMPORT, EXPORT, SYSTEM]}}
+        - {name: target_type, in: query, schema: {type: string, enum: [User, Transformer, Inspection, Fault, Maintenance, Installation, Report]}}
+        - {name: target_id, in: query, schema: {type: string}}
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: is_sensitive, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /audit/transformers/{transformerId}:
+    get:
+      tags: [Audit]
+      summary: List audit logs for a transformer
+      description: Super Admin only. This is the actual mounted transformer audit route.
+      parameters:
+        - name: transformerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: action_category, in: query, schema: {type: string, enum: [AUTH, USER_MANAGEMENT, TRANSFORMER_MANAGEMENT, INSPECTION, FAULT_MANAGEMENT, MAINTENANCE, INSTALLATION, REPORTING, IMPORT, EXPORT, SYSTEM]}}
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: is_sensitive, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  /audit/actions:
+    get:
+      tags: [Audit]
+      summary: List audit categories and actions
+      description: Super Admin only. Returns known audit categories/actions plus values already present in stored logs.
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditActionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Super Admin role required
+
+  # ─── REPORTS ──────────────────────────────────────────────────────────────────
+
+  /reports/transformers:
+    get:
+      tags: [Reports]
+      summary: Generate transformer report
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+        - {name: operational_status, in: query, schema: {type: string, enum: [Active, Inactive, Decommissioned, 'Under Maintenance', Faulty]}}
+        - {name: format, in: query, schema: {type: string, enum: [json], default: json}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ReportResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /reports/inspections:
+    get:
+      tags: [Reports]
+      summary: Generate inspection report
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: transformer_id, in: query, schema: {type: string}}
+        - {name: condition, in: query, schema: {type: string, enum: [Good, Fair, Poor, Critical]}}
+        - {name: format, in: query, schema: {type: string, enum: [json], default: json}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ReportResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /reports/faults:
+    get:
+      tags: [Reports]
+      summary: Generate fault report
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: fault_status, in: query, schema: {type: string, enum: [Open, Assigned, 'In Progress', Resolved, Closed]}}
+        - {name: severity, in: query, schema: {type: string, enum: [Minor, Major, Critical, 'Complete Outage']}}
+        - {name: fault_type, in: query, schema: {type: string, enum: [Overload, 'Oil Leak', 'Bushing Failure', 'Winding Failure', 'Complete Failure', Fire, Theft, Vandalism, 'LV Side Fault', 'HV Side Fault', Other]}}
+        - {name: format, in: query, schema: {type: string, enum: [json], default: json}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ReportResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /reports/maintenance:
+    get:
+      tags: [Reports]
+      summary: Generate maintenance report
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: maintenance_type, in: query, schema: {type: string, enum: [Preventive, Corrective, Emergency]}}
+        - {name: format, in: query, schema: {type: string, enum: [json], default: json}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ReportResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /reports/asset-register:
+    get:
+      tags: [Reports]
+      summary: Generate asset register report
+      parameters:
+        - {name: startDate, in: query, schema: {type: string, format: date}}
+        - {name: endDate, in: query, schema: {type: string, format: date}}
+        - {name: territory_id, in: query, schema: {type: string}}
+        - {name: service_area_id, in: query, schema: {type: string}}
+        - {name: feeder_id, in: query, schema: {type: string}}
+        - {name: district_id, in: query, schema: {type: string}}
+        - {name: network_voltage_kv, in: query, schema: {type: number, enum: [11, 33]}}
+        - {name: kva_rating, in: query, schema: {type: number, enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]}}
+        - {name: operational_status, in: query, schema: {type: string, enum: [Active, Inactive, Decommissioned, 'Under Maintenance', Faulty]}}
+        - {name: format, in: query, schema: {type: string, enum: [json], default: json}}
+      responses:
+        '200':
+          $ref: '#/components/responses/ReportResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  # ─── EXPORTS ──────────────────────────────────────────────────────────────────
+
+  /exports/csv:
+    post:
+      tags: [Exports]
+      summary: Generate a CSV export
+      description: Direct CSV response for tested report export types. Raw GPS coordinates are excluded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: CSV export generated
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /exports/json:
+    post:
+      tags: [Exports]
+      summary: Generate a JSON export
+      description: JSON export envelope for tested report export types. Raw GPS coordinates are excluded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ExportJsonResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   parameters:
     Id:
@@ -1336,6 +2011,323 @@ components:
         is_email_verified:
           type: boolean
         created_at:
+          type: string
+          format: date-time
+
+    UserCreate:
+      type: object
+      required: [name, email, password, confirmPassword, role]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Must include uppercase, lowercase, number, and special character.
+        confirmPassword:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]
+        territory_id:
+          type: string
+          description: Required for Territory Manager, Engineer, and Field Technician.
+        service_area_id:
+          type: string
+          description: Required for Engineer and Field Technician.
+        is_active:
+          type: boolean
+          default: true
+
+    UserUpdate:
+      type: object
+      description: Safe profile/admin-managed fields only. Password, role, and activation status are ignored by this endpoint.
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        territory_id:
+          type: string
+        service_area_id:
+          type: string
+        preferences:
+          type: object
+          properties:
+            theme:
+              type: string
+              enum: [light, dark, system]
+            notifications:
+              type: object
+              properties:
+                email:
+                  type: boolean
+                push:
+                  type: boolean
+                sms:
+                  type: boolean
+            dashboard_widgets:
+              type: array
+              items:
+                type: string
+
+    UserRoleChange:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [Super Admin, Territory Manager, Engineer, Field Technician, Viewer]
+        territory_id:
+          type: string
+          description: Required for Territory Manager, Engineer, and Field Technician.
+        service_area_id:
+          type: string
+          description: Required for Engineer and Field Technician.
+
+    UserDeactivate:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    AdminStats:
+      type: object
+      properties:
+        users:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+            by_role:
+              type: object
+        transformers:
+          type: object
+          properties:
+            total:
+              type: integer
+            by_status:
+              type: object
+        faults:
+          type: object
+          properties:
+            open:
+              type: integer
+        inspections:
+          type: object
+          properties:
+            overdue:
+              type: integer
+        maintenance:
+          type: object
+          properties:
+            upcoming:
+              type: integer
+        audit:
+          type: object
+          properties:
+            recent_activity_count:
+              type: integer
+        generated_at:
+          type: string
+          format: date-time
+
+    MaintenanceMode:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        message:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        enabled_by:
+          type: string
+          nullable: true
+        enabled_at:
+          type: string
+          format: date-time
+          nullable: true
+        disabled_by:
+          type: string
+          nullable: true
+        disabled_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MaintenanceModeUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        message:
+          type: string
+          maxLength: 500
+          example: System is under maintenance
+        reason:
+          type: string
+          maxLength: 500
+          example: Planned maintenance
+
+    BackupRequest:
+      type: object
+      properties:
+        backup_name:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$'
+          example: nightly_backup
+        retention_until:
+          type: string
+          format: date-time
+          description: Must be a future date.
+        collections:
+          type: array
+          items:
+            type: string
+          description: Optional collection allowlist. If omitted, all non-system collections are included.
+        metadata:
+          type: object
+
+    BackupJob:
+      type: object
+      properties:
+        _id:
+          type: string
+        backup_id:
+          type: string
+        filename:
+          type: string
+        storage_key:
+          type: string
+          description: Internal storage key. No download URL is returned.
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, COMPLETED, FAILED]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        created_by:
+          oneOf:
+            - type: string
+            - type: object
+        checksum:
+          type: string
+        compression:
+          type: string
+          enum: [none, gzip]
+        encryption:
+          type: boolean
+        size_bytes:
+          type: integer
+        collections:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              document_count:
+                type: integer
+        schema_version:
+          type: string
+        app_version:
+          type: string
+        retention_until:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+        manifest:
+          type: object
+        error_message:
+          type: string
+
+    RestoreRequest:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation:
+          type: string
+          description: Must exactly match RESTORE BACKUP <backupId>.
+          example: RESTORE BACKUP BKP-20260706093048522-DSP9FS
+        dryRun:
+          type: boolean
+          default: true
+          description: When true, validates artifact and restore plan without mutating data.
+        collections:
+          type: array
+          items:
+            type: string
+            enum: [transformers, inspections, faults, maintenances]
+          description: Optional restore collection subset. Values are restricted by the server allowlist and backup contents.
+
+    RestoreResult:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+        backup_id:
+          type: string
+        verified:
+          type: boolean
+          description: Present on dry-run responses.
+        collections:
+          type: array
+          items:
+            type: string
+        plan:
+          type: object
+          properties:
+            collections:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  document_count:
+                    type: integer
+            total_documents:
+              type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        pre_restore_backup_id:
+          type: string
+          description: Present on destructive restore responses.
+        restored_collections:
+          type: array
+          items:
+            type: string
+        restored_counts:
+          type: object
+        completed_at:
           type: string
           format: date-time
 
@@ -1446,6 +2438,188 @@ components:
           type: integer
           minimum: 0
 
+    ReportEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+        summary:
+          type: object
+          properties:
+            title:
+              type: string
+            total:
+              type: integer
+        filters:
+          type: object
+        generated_at:
+          type: string
+          format: date-time
+
+    ExportRequest:
+      type: object
+      required: [report_type]
+      properties:
+        report_type:
+          type: string
+          enum: [transformers, inspections, faults, maintenance, asset-register]
+        filters:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+            territory_id:
+              type: string
+            service_area_id:
+              type: string
+            feeder_id:
+              type: string
+            district_id:
+              type: string
+            network_voltage_kv:
+              type: number
+              enum: [11, 33]
+            kva_rating:
+              type: number
+              enum: [50, 100, 160, 200, 250, 315, 500, 630, 1000]
+            operational_status:
+              type: string
+              enum: [Active, Inactive, Decommissioned, 'Under Maintenance', Faulty]
+            transformer_id:
+              type: string
+            condition:
+              type: string
+              enum: [Good, Fair, Poor, Critical]
+            fault_status:
+              type: string
+              enum: [Open, Assigned, 'In Progress', Resolved, Closed]
+            severity:
+              type: string
+              enum: [Minor, Major, Critical, 'Complete Outage']
+            fault_type:
+              type: string
+              enum: [Overload, 'Oil Leak', 'Bushing Failure', 'Winding Failure', 'Complete Failure', Fire, Theft, Vandalism, 'LV Side Fault', 'HV Side Fault', Other]
+            maintenance_type:
+              type: string
+              enum: [Preventive, Corrective, Emergency]
+
+    ExportJsonEnvelope:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            report_type:
+              type: string
+            format:
+              type: string
+              enum: [json]
+            total:
+              type: integer
+            filters:
+              type: object
+            generated_at:
+              type: string
+              format: date-time
+        rows:
+          type: array
+          items:
+            type: object
+
+    AnalyticsEnvelope:
+      type: object
+      properties:
+        summary:
+          type: object
+        breakdowns:
+          type: object
+        trends:
+          type: array
+          items:
+            type: object
+        risks:
+          type: array
+          items:
+            type: object
+        filters:
+          type: object
+        generated_at:
+          type: string
+          format: date-time
+
+    AuditLogEntry:
+      type: object
+      properties:
+        _id:
+          type: string
+        user_id:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+            role:
+              type: string
+        action:
+          type: string
+        action_category:
+          type: string
+        target_user_id:
+          type: object
+        target_transformer_id:
+          type: object
+        target_record_type:
+          type: string
+        target_record_id:
+          type: string
+        details:
+          type: string
+        request_method:
+          type: string
+        request_path:
+          type: string
+        old_values:
+          type: object
+          description: Sensitive password/token/secret values are redacted.
+        new_values:
+          type: object
+          description: Sensitive password/token/secret values are redacted.
+        metadata:
+          type: object
+          description: Sensitive password/token/secret values are redacted.
+        is_sensitive:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuditActionsEnvelope:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            type: string
+        actions:
+          type: array
+          items:
+            type: string
+
   responses:
     PaginatedResponse:
       description: Paginated list
@@ -1487,6 +2661,218 @@ components:
                 type: string
               data:
                 type: object
+
+    UserListResponse:
+      description: Users retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+              pagination:
+                type: object
+                properties:
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+
+    UserResponseEnvelope:
+      description: User operation completed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/User'
+
+    AdminStatsResponse:
+      description: Admin system statistics retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/AdminStats'
+
+    MaintenanceModeResponse:
+      description: Maintenance mode status returned successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/MaintenanceMode'
+
+    BackupResponse:
+      description: Backup operation response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/BackupJob'
+
+    BackupListResponse:
+      description: Backup history retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupJob'
+              pagination:
+                type: object
+                properties:
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+
+    RestoreResponse:
+      description: Restore dry-run or restore operation completed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: '#/components/schemas/RestoreResult'
+
+    ReportResponse:
+      description: Report generated successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+                example: Report generated successfully
+              data:
+                $ref: '#/components/schemas/ReportEnvelope'
+
+    ExportJsonResponse:
+      description: JSON export generated successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+                example: Export generated successfully
+              data:
+                $ref: '#/components/schemas/ExportJsonEnvelope'
+
+    AnalyticsResponse:
+      description: Analytics generated successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/AnalyticsEnvelope'
+
+    AuditListResponse:
+      description: Audit logs retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLogEntry'
+              pagination:
+                type: object
+                properties:
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+
+    AuditActionsResponse:
+      description: Audit categories and actions retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+              data:
+                $ref: '#/components/schemas/AuditActionsEnvelope'
 
     ValidationError:
       description: Validation failed

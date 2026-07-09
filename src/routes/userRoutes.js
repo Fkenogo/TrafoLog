@@ -6,7 +6,10 @@ const { validate } = require('../middleware/validation');
 const {
   createUserSchema,
   updateUserSchema,
-  userQuerySchema
+  userQuerySchema,
+  changeUserRoleSchema,
+  activateUserSchema,
+  deactivateUserSchema
 } = require('../validators/userValidator');
 
 /**
@@ -17,7 +20,7 @@ const {
 router.get(
   '/',
   authenticate,
-  authorize('Super Admin', 'Territory Manager'),
+  authorize('Super Admin'),
   validate(userQuerySchema, 'query'),
   UserController.getAllUsers
 );
@@ -30,7 +33,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
-  authorize('Super Admin', 'Territory Manager'),
+  authorize('Super Admin'),
   UserController.getUserById
 );
 
@@ -42,7 +45,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('Super Admin', 'Territory Manager'),
+  authorize('Super Admin'),
   validate(createUserSchema),
   UserController.createUser
 );
@@ -55,7 +58,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('Super Admin', 'Territory Manager'),
+  authorize('Super Admin'),
   validate(updateUserSchema),
   UserController.updateUser
 );
@@ -81,6 +84,7 @@ router.post(
   '/:id/activate',
   authenticate,
   authorize('Super Admin'),
+  validate(activateUserSchema),
   UserController.activateUser
 );
 
@@ -92,7 +96,8 @@ router.post(
 router.post(
   '/:id/deactivate',
   authenticate,
-  authorize('Super Admin', 'Territory Manager'),
+  authorize('Super Admin'),
+  validate(deactivateUserSchema),
   UserController.deactivateUser
 );
 
@@ -105,6 +110,7 @@ router.post(
   '/:id/role',
   authenticate,
   authorize('Super Admin'),
+  validate(changeUserRoleSchema),
   UserController.changeUserRole
 );
 

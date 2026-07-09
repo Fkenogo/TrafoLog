@@ -1,0 +1,70 @@
+{
+  "version": {
+    "success": true,
+    "version": "2.0.0",
+    "build": "development",
+    "release_date": "2024-01-15",
+    "api": {
+      "name": "kVAssetTracker API",
+      "description": "Transformer Asset Management Platform"
+    }
+  },
+  "admin": {
+    "ok": true,
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "System stats retrieved successfully",
+      "timestamp": "2026-07-08T09:19:46.111Z",
+      "data": {
+        "users": {
+          "total": 15,
+          "active": 14,
+          "by_role": {
+            "Super Admin": 4,
+            "Engineer": 2,
+            "Viewer": 3,
+            "Field Technician": 5,
+            "Territory Manager": 1
+          }
+        },
+        "transformers": {
+          "total": 66,
+          "by_status": {
+            "Decommissioned": 10,
+            "Active": 37,
+            "Under Maintenance": 8,
+            "Faulty": 8,
+            "Unverified": 3
+          }
+        },
+        "faults": {
+          "open": 87
+        },
+        "inspections": {
+          "overdue": 7
+        },
+        "maintenance": {
+          "upcoming": 35
+        },
+        "audit": {
+          "recent_activity_count": 343
+        },
+        "generated_at": "2026-07-08T09:19:46.111Z"
+      }
+    }
+  },
+  "browser": {
+    "product": "Chrome/149.0.7827.22",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "automatedCoverage": "Chromium via Puppeteer",
+    "pilotPrimaryBrowsers": [
+      "Chrome",
+      "Edge"
+    ],
+    "manualValidationRecommended": [
+      "Safari",
+      "Firefox"
+    ]
+  }
+}

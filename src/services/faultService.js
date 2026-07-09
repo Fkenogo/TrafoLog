@@ -1,5 +1,6 @@
 const Fault = require('../models/Fault');
 const Transformer = require('../models/Transformer');
+const User = require('../models/User');
 const AssetTimeline = require('../models/AssetTimeline');
 const BaseService = require('./baseService');
 const NotificationService = require('./notificationService');
@@ -77,6 +78,11 @@ class FaultService extends BaseService {
         throw new ApiError(404, 'Fault not found');
       }
 
+      const assignedUser = await User.findById(assignedTo).select('name email phone role is_active');
+      if (!assignedUser) {
+        throw new ApiError(404, 'Assigned user not found');
+      }
+
       // Check if fault can be assigned
       if (fault.fault_status === 'Resolved' || fault.fault_status === 'Closed') {
         throw new ApiError(400, 'Cannot assign a resolved or closed fault');
@@ -99,7 +105,7 @@ class FaultService extends BaseService {
 
       // Send notification (non-fatal)
       try {
-        await NotificationService.sendAssignmentNotification({ fault: updated, transformer, assignedTo });
+        await NotificationService.sendAssignmentNotification({ fault: updated, transformer, assignedTo: assignedUser });
       } catch (notifError) {
         logger.warn('FaultService: sendAssignmentNotification failed (non-fatal):', notifError.message);
       }
@@ -333,6 +339,7 @@ class FaultService extends BaseService {
       return await this.model.find({
         transformer_id: transformerId
       })
+      .populate('inspection_id')
       .populate('reported_by', 'name email')
       .populate('assigned_to', 'name email')
       .populate('resolved_by', 'name email')

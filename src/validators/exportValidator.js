@@ -1,8 +1,15 @@
 const Joi = require('joi');
+const { reportQuerySchema } = require('./reportValidator');
+
+const exportFiltersSchema = reportQuerySchema.fork(['format'], (schema) => schema.optional().strip());
 
 const exportOptionsSchema = Joi.object({
-  format: Joi.string().valid('excel', 'pdf', 'csv').default('excel'),
-  filters: Joi.object()
+  report_type: Joi.string().valid('transformers', 'inspections', 'faults', 'maintenance', 'asset-register').required(),
+  filters: exportFiltersSchema.default({})
 });
 
-module.exports = { exportOptionsSchema };
+const exportFormatParamSchema = Joi.object({
+  format: Joi.string().valid('csv', 'json').required()
+});
+
+module.exports = { exportOptionsSchema, exportFormatParamSchema };

@@ -112,7 +112,7 @@ class FaultController {
         page: parseInt(page),
         limit: parseInt(limit),
         sort: { fault_date: -1 },
-        populate: ['transformer_id', 'assigned_to', 'reported_by']
+        populate: ['transformer_id', 'inspection_id', 'assigned_to', 'reported_by']
       });
 
       return successResponse(res, 200, 'Faults retrieved successfully', result);
@@ -125,9 +125,18 @@ class FaultController {
     try {
       const fault = await FaultService.getById(
         req.params.id,
-        ['transformer_id', 'reported_by', 'assigned_to', 'resolved_by']
+        ['transformer_id', 'inspection_id', 'reported_by', 'assigned_to', 'resolved_by']
       );
       return successResponse(res, 200, 'Fault retrieved successfully', fault);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async update(req, res, next) {
+    try {
+      const fault = await FaultService.update(req.params.id, req.body, req.user.id);
+      return successResponse(res, 200, 'Fault updated successfully', fault);
     } catch (error) {
       next(error);
     }

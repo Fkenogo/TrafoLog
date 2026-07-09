@@ -190,6 +190,38 @@ describe('GET /api/transformers/service-area/:serviceAreaId', () => {
   });
 });
 
+// ─────────────────────────────── getById ───────────────────────────────
+
+describe('GET /api/transformers/:id', () => {
+  it('returns transformer detail for a valid transformer', async () => {
+    const res = await request(app.getApp())
+      .get(`/api/transformers/${transformerId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('_id', String(transformerId));
+    expect(res.body.data).toHaveProperty('asset_id', TRANSFORMER_ASSET_ID);
+  });
+
+  it('returns a clean 404 for an unknown transformer', async () => {
+    const fakeId = '000000000000000000000002';
+    const res = await request(app.getApp())
+      .get(`/api/transformers/${fakeId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Transformer not found');
+  });
+
+  it('returns 401 without token', async () => {
+    const res = await request(app.getApp())
+      .get(`/api/transformers/${transformerId}`);
+    expect(res.status).toBe(401);
+  });
+});
+
 // ─────────────────────────────── getNearby ───────────────────────────────
 
 describe('GET /api/transformers/nearby', () => {

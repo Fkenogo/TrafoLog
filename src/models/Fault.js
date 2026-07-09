@@ -7,6 +7,11 @@ const faultSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  inspection_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Inspection',
+    index: true
+  },
   reported_by: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

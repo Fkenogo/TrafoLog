@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const AuditController = require('../controllers/auditController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validation');
+const { auditQuerySchema } = require('../validators/auditValidator');
 
 /**
  * @route GET /api/audit
@@ -12,6 +14,7 @@ router.get(
   '/',
   authenticate,
   authorize('Super Admin'),
+  validate(auditQuerySchema, 'query'),
   AuditController.getAuditLogs
 );
 
@@ -24,6 +27,7 @@ router.get(
   '/user/:userId',
   authenticate,
   authorize('Super Admin'),
+  validate(auditQuerySchema, 'query'),
   AuditController.getUserAuditLogs
 );
 
@@ -36,6 +40,7 @@ router.get(
   '/transformers/:transformerId',
   authenticate,
   authorize('Super Admin'),
+  validate(auditQuerySchema, 'query'),
   AuditController.getTransformerAuditLogs
 );
 

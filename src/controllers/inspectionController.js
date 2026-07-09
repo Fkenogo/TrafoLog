@@ -46,7 +46,7 @@ class InspectionController {
    */
   async getById(req, res, next) {
     try {
-      const inspection = await InspectionService.getInspectionById(req.params.id);
+      const inspection = await InspectionService.getById(req.params.id, ['transformer_id', 'inspector_id']);
       return successResponse(res, 200, 'Inspection retrieved successfully', inspection);
     } catch (error) {
       next(error);

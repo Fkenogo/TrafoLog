@@ -6,11 +6,13 @@ interface DataTableProps<T> {
   rows: T[];
   emptyTitle: string;
   emptyMessage: string;
-  renderRow: (row: T) => ReactNode;
+  renderRow: (row: T, index: number) => ReactNode;
 }
 
 export function DataTable<T>({ columns, rows, emptyTitle, emptyMessage, renderRow }: DataTableProps<T>) {
-  if (rows.length === 0) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+
+  if (safeRows.length === 0) {
     return <EmptyState title={emptyTitle} message={emptyMessage} />;
   }
 
@@ -24,7 +26,7 @@ export function DataTable<T>({ columns, rows, emptyTitle, emptyMessage, renderRo
             ))}
           </tr>
         </thead>
-        <tbody>{rows.map(renderRow)}</tbody>
+        <tbody>{safeRows.map((row, index) => renderRow(row, index))}</tbody>
       </table>
     </div>
   );

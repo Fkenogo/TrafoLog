@@ -5,6 +5,7 @@ const redis = require('../config/redis');
 const User = require('../models/User');
 const Transformer = require('../models/Transformer');
 const Fault = require('../models/Fault');
+const Notification = require('../models/Notification');
 
 const TEST_EMAIL = 'admin.fault@example.com';
 const TEST_PASSWORD = 'Admin@1234';
@@ -25,6 +26,7 @@ beforeAll(async () => {
   const oldUser = await User.findOne({ email: TEST_EMAIL });
   if (oldUser) {
     await Fault.deleteMany({ reported_by: oldUser._id });
+    await Notification.deleteMany({ user_id: oldUser._id });
     await User.deleteOne({ _id: oldUser._id });
   }
   await Transformer.deleteOne({ asset_id: TRANSFORMER_ASSET_ID });
@@ -89,6 +91,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await Fault.deleteMany({ transformer_id: transformerId });
+  await Notification.deleteMany({ user_id: userId });
   await Transformer.deleteOne({ asset_id: TRANSFORMER_ASSET_ID });
   await User.deleteOne({ email: TEST_EMAIL });
   await database.disconnect();
@@ -175,8 +178,31 @@ describe('GET /api/faults/:id', () => {
   });
 });
 
+describe('PUT /api/faults/:id', () => {
+  it('updates editable fault fields without changing immutable ownership', async () => {
+    const res = await request(app.getApp())
+      .put(`/api/faults/${faultId}`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        fault_description: 'Transformer overload confirmed after field review',
+        severity: 'Major',
+        customers_affected: 12,
+        area_affected: 'Test Site feeder segment'
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.fault_description).toBe('Transformer overload confirmed after field review');
+    expect(res.body.data.severity).toBe('Major');
+    expect(res.body.data.customers_affected).toBe(12);
+    expect(res.body.data.reported_by).toBeDefined();
+  });
+});
+
 describe('PUT /api/faults/:id/assign', () => {
   it('assigns fault to current user', async () => {
+    await Notification.deleteMany({ user_id: userId, type: 'FAULT_ASSIGNED' });
+
     const res = await request(app.getApp())
       .put(`/api/faults/${faultId}/assign`)
       .set('Authorization', `Bearer ${authToken}`)
@@ -185,6 +211,13 @@ describe('PUT /api/faults/:id/assign', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.fault_status).toBe('Assigned');
+
+    const notification = await Notification.findOne({
+      user_id: userId,
+      type: 'FAULT_ASSIGNED'
+    });
+    expect(notification).toBeTruthy();
+    expect(String(notification.data.fault_id)).toBe(res.body.data._id);
   });
 });
 
