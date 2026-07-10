@@ -10,7 +10,6 @@ RUN npm ci --only=production
 
 # Copy source code
 COPY src ./src
-COPY uploads ./uploads
 
 # Create upload directories
 RUN mkdir -p uploads/photos uploads/reports uploads/temp
