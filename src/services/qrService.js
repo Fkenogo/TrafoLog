@@ -1,5 +1,5 @@
 const QRCode = require('qrcode');
-const QRCodeModel = require('../models/QRCode');
+const QRCodeModel = require('../models/QrCode');
 const Transformer = require('../models/Transformer');
 const { ApiError } = require('../utils/error');
 const { logger } = require('../utils/logger');
