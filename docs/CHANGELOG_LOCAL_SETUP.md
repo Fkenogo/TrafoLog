@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-07-10 — Railway Temporary Preview Deployment Guide
+
+**Summary:** Added Railway-only temporary preview deployment documentation covering the backend, frontend, MongoDB, Redis, environment variables, CORS, cookie/auth caveats, seeded demo data, validation, troubleshooting, and shutdown steps.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md` | Created Railway temporary preview deployment guide |
+| `docs/CHANGELOG_LOCAL_SETUP.md` | Added this changelog entry |
+
+### Validation
+
+- Reviewed `package.json`, `frontend/package.json`, backend Mongo/Redis config, `src/app.js`, frontend env usage, `.env.example`, Phase 9F seed/reset/check scripts, and demo-user docs.
+- Confirmed backend start command: `npm start`.
+- Confirmed frontend build command: `npm run build`.
+- Confirmed frontend preview script already exists: `npm run preview`.
+- Confirmed backend env names: `MONGODB_URI`, `REDIS_URL`, and `CLIENT_URL`.
+- `node scripts/checkLocalEnvironment.js`: first run failed backend health because the backend was not running; rerun after `npm start` passed Mongo, Redis, Backend, Frontend, Uploads, and Backup folder.
+- `node scripts/phase9fSeedData.js`: passed and printed the full demo-account block.
+- `node scripts/resetDemoPasswords.js`: passed; all 11 demo passwords reset to `Phase9F@1234`.
+- `node scripts/phase9fValidateApiWorkflows.js`: passed with 64 passed, 0 failed, and 4 skipped/gap.
+- `cd frontend && npm run build`: passed with the existing Vite chunk-size warning.
+- `npm test`: passed with 11 suites and 184 tests.
+
+**Guide:** `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md`
+
+---
+
 ## 2026-07-08 — Phase 9G-Final Demo Accounts & Local Environment Audit
 
 **Summary:** Made local demo handoff more reproducible. Phase 9F seeding now prints a full demo-account credential block, demo users are documented, passwords can be reset to a known default, and a local environment checker verifies MongoDB, Redis, backend, frontend, uploads, and backup storage readiness.

@@ -1,0 +1,212 @@
+# Prompt 12 — Bulk Data Import Tool
+
+**Phase:** 08 — Bulk Data Import  
+**Depends on:** Prompt 11 complete — offline PWA working
+
+---
+
+## Context
+
+Offline PWA is complete. Now build the bulk data import tool for migrating UEDCL's existing transformer records into the system.
+
+UEDCL has existing records in spreadsheets and reports. This tool allows a Super Admin to upload these files in bulk. Imported records are automatically marked as **Verified** because they come from official UEDCL sources.
+
+---
+
+## Install Dependencies
+
+```bash
+npm install papaparse @types/papaparse
+# xlsx is already installed from Prompt 10
+```
+
+---
+
+## Task
+
+**File:** `src/pages/ImportPage.tsx`  
+**Route:** `/import`  
+**Access:** Super Admin only
+
+Build a 5-step wizard interface.
+
+---
+
+## Step 1: Upload & Format Detection
+
+- File dropzone — accepts `.xlsx`, `.xls`, `.csv`
+- Drag-and-drop or click to browse
+- On file drop:
+  - Parse with `xlsx` (for Excel) or `papaparse` (for CSV)
+  - Read the first row as headers
+  - Show detected column names to the user
+  - Show row count: _"1,847 rows detected"_
+
+---
+
+## Step 2: Column Mapping
+
+If the file's column headers exactly match the import template: **auto-map and skip to Step 3**.
+
+Otherwise, show a mapping interface:
+
+**Left side:** list of detected column names from the file  
+**Right side:** dropdown for each → maps to a system field
+
+**Required mappings** (must be mapped before proceeding):
+
+| System Field | Description |
+|---|---|
+| `site_name` | Location name of the transformer |
+| `kva_rating` | Capacity in kVA (50, 100, 160, 200, 250, 315, 500, 630, 1000) |
+| `network_voltage_kv` | Network voltage: accept `11`, `33`, `"11kV"`, `"33kV"`, `"11 kV"` — normalise to integer |
+
+**Optional mappings:**
+
+`uedcl_reference` · `manufacturer` · `serial_number` · `year_manufactured`  
+`voltage_secondary` · `phase_type` · `cooling_type` · `mounting_type`  
+`territory_name` · `service_area_name` · `feeder_name` · `substation_name`  
+`district_name` · `sub_county` · `parish` · `village`  
+`latitude` · `longitude` · `install_date` · `installing_contractor`  
+`operational_status`
+
+- **"Skip Column"** option for irrelevant columns
+- **"Download Import Template"** button — generates a correctly formatted Excel file with all column headers and one example data row
+
+---
+
+## Step 3: Validation
+
+Before import, validate every row. Two categories:
+
+### 🔴 Errors (block import of that row)
+
+| Check | Error Message |
+|---|---|
+| `kva_rating` not in `[50,100,160,200,250,315,500,630,1000]` | "Invalid kVA rating: [value]" |
+| `network_voltage_kv` not 11 or 33 (after normalisation) | "Invalid network voltage: [value]" |
+| `kva + network_voltage` combination not in `transformer_ratings` table | "No matching transformer rating for [kVA]kVA/[V]kV" |
+| `site_name` is empty | "Site name is required" |
+
+### 🟡 Warnings (import proceeds, row flagged for review)
+
+| Check | Warning Message |
+|---|---|
+| `serial_number` matches existing transformer in database | "Possible duplicate — serial number [X] already exists (Asset: TRF-XXXXXX)" |
+| `latitude` / `longitude` outside Uganda bounding box (lat: -1.5 to 4.2, lng: 29.5 to 35.0) | "GPS coordinates appear to be outside Uganda" |
+| `year_manufactured` before 1950 or after current year | "Unusual manufacture year: [value]" |
+| `territory_name` does not match any known territory | "Territory '[name]' not found — field will be left blank" |
+| `district_name` does not match any known district | "District '[name]' not found — field will be left blank" |
+
+---
+
+## Step 4: Preview
+
+Paginated preview table (20 rows per page):
+
+| # | Site Name | Rating | Network | Territory | District | Status |
+|---|---|---|---|---|---|---|
+| 1 | Nakawa Market | 315kVA | 11kV | Central | Kampala | ✅ Valid |
+| 2 | Gulu North | 100kVA | 33kV | Northern | Gulu | ⚠ Warning |
+| 3 | Unknown Site | 999kVA | 11kV | — | — | ❌ Error |
+
+**Summary header:**
+```
+✅ 1,723 rows ready to import
+⚠  89 rows with warnings (will import with flags)
+❌ 35 rows with errors (will be skipped)
+```
+
+**Actions:**
+- "Download Error Report" → exports error rows to Excel for correction
+- "Proceed with valid rows only" — skips error rows, imports valid + warning rows
+- "Fix and re-upload" — returns to Step 1
+
+---
+
+## Step 5: Import Execution
+
+On "Confirm Import":
+
+**Process in batches of 100 rows** with a progress bar:
+```
+Importing... ████████░░░░  1,247 / 1,812 rows
+```
+
+**For each valid/warning row:**
+1. Look up `territory_id` by matching `territory_name` to `service_territories.name`
+2. Look up `district_id` by matching `district_name` to `districts.name`
+3. Look up `rating_id` from `transformer_ratings` by `kva + network_voltage_kv`
+4. Create transformer record with:
+   - `record_status = 'verified'`
+   - `gps_method = 'imported'` (if lat/lng provided)
+   - `batch_import_id = <UUID generated for this import batch>`
+   - `asset_id` auto-generated by database trigger
+5. Add timeline entry: _"Imported from UEDCL records"_
+
+**For duplicate serial numbers:**
+- Skip the row, count as `skipped`
+
+**On completion, show summary:**
+```
+Import Complete!
+
+✓  1,723  records imported successfully
+⚠     89  imported with warnings
+⊘     35  rows skipped (duplicate serial numbers)
+✗      0  errors
+
+[Download Full Import Report]   [View Imported Transformers]
+```
+
+Save a record to `import_logs` table with all counts and error details.
+
+---
+
+## Import History
+
+At the bottom of the Import page (or as a sub-tab):
+
+Table of all past imports:
+
+| Date | File Name | Imported By | Total | Success | Skipped | Errors |
+|---|---|---|---|---|---|---|
+| 2026-06-05 | uedcl_central_2026.xlsx | Admin | 1,847 | 1,723 | 35 | 89 |
+
+---
+
+## Rollback Feature
+
+For the **most recent import only**, show a "Undo this import" button.
+
+On click:
+1. Confirm dialog: _"This will permanently delete all 1,723 transformers from this import. Are you sure?"_
+2. Delete all transformers with matching `batch_import_id`
+3. Remove the `import_logs` record
+4. Show confirmation: _"Import rolled back successfully"_
+
+> This feature exists only for the most recent import. It cannot be used to undo imports older than 24 hours.
+
+---
+
+## Import Template Download
+
+The downloadable template (Excel file) should include:
+
+1. **Instructions sheet** — explains each column, valid values, and examples
+2. **Data sheet** — column headers only, with one example row (shown in gray, easily deletable)
+3. **Valid Values sheet** — lookup tables:
+   - Valid kVA ratings
+   - Valid network voltages
+   - UEDCL service territories
+   - Uganda districts
+
+---
+
+## Notes
+
+> Network voltage normalisation: accept `11`, `"11"`, `"11kV"`, `"11 kV"`, `"11KV"` — all must normalise to the integer `11`. Same for 33.
+
+> The `batch_import_id` field on the `transformers` table was added in Prompt 03. Verify it exists before running this prompt.
+
+> For files with 5,000+ rows, the validation step may take a few seconds. Show a loading indicator with row count: _"Validating... 3,241 / 5,000 rows"_

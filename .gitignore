@@ -2,3 +2,25 @@ node_modules/
 .env
 logs/
 *.log
+
+# Local/generated
+node_modules/
+logs/
+uploads/
+.DS_Store
+docs/.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+serviceAccountKey.json
+firebase-service-account.json
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
