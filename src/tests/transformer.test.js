@@ -22,7 +22,7 @@ beforeAll(async () => {
 
   const Territory = require('../models/Territory');
   const ServiceArea = require('../models/ServiceArea');
-  const QRCode = require('../models/QRCode');
+  const QRCode = require('../models/QrCode');
   const AssetTimeline = require('../models/AssetTimeline');
 
   // Clean up any leftover test data
@@ -110,7 +110,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const Territory = require('../models/Territory');
   const ServiceArea = require('../models/ServiceArea');
-  const QRCode = require('../models/QRCode');
+  const QRCode = require('../models/QrCode');
   const AssetTimeline = require('../models/AssetTimeline');
 
   await QRCode.deleteMany({ transformer_id: { $in: [transformerId, decommissionTransformerId] } });

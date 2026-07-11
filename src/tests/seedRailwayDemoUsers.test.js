@@ -103,7 +103,7 @@ describe('seedRailwayDemoUsers', () => {
   });
 
   beforeEach(async () => {
-    process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://integration-test-db';
+    process.env.MONGODB_URI = originalMongoUri;
     await User.deleteMany({ email: { $in: demoEmails } });
     await RefreshToken.deleteMany({});
     await Session.deleteMany({});

@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-07-11 — QRCode Model Import Casing Fix
+
+**Summary:** Fixed the `OverwriteModelError: Cannot overwrite QRCode model once compiled` failure exposed by the full Jest run. All local imports now use the physical Linux-safe filename `QrCode.js`; the Mongoose model name remains `QRCode` and production QR behavior is unchanged.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `src/models/index.js` | Corrected the QR model barrel import from `./QRCode` to `./QrCode` |
+| `src/tests/transformer.test.js` | Corrected both QR cleanup imports to `../models/QrCode` |
+| `src/tests/seedRailwayDemoUsers.test.js` | Restored the captured test database URI between tests instead of substituting a different URI while Mongoose is connected |
+| `docs/superpowers/reports/2026-07-11-qrcode-overwrite-model-fix.md` | Added the implementation and validation report |
+| `docs/CHANGELOG_LOCAL_SETUP.md` | Added this changelog entry |
+
+### Root cause
+
+`transformer.test.js` first loaded the application, which reached `src/models/QrCode.js` through `routes -> transformerController -> qrService`. Its setup then required the same physical file as `../models/QRCode`. On the local case-insensitive filesystem, Jest executed the differently cased module identity again, while Mongoose already had the `QRCode` model registered. The new seeder also reached the remaining stale `./QRCode` barrel import through `src/models/index.js`. No `jest.resetModules()`, manual module-cache clearing, Mongoose model deletion, or Jest module isolation was involved.
+
+### Validation
+
+- `node --check scripts/seedRailwayDemoUsers.js`: passed.
+- `npx jest --runInBand src/tests/seedRailwayDemoUsers.test.js`: 1 suite passed; 9 tests passed.
+- `npx jest --runInBand src/tests/transformer.test.js`: 1 suite passed; 30 tests passed.
+- `npm test`: 12 suites passed; 193 tests passed.
+- `cd frontend && npm run build`: passed; existing Vite chunk-size warning remains.
+- Repository search for local `models/QRCode` imports: no matches.
+- Confirmed npm package imports `require('qrcode')` remain unchanged.
+
+**Report:** `docs/superpowers/reports/2026-07-11-qrcode-overwrite-model-fix.md`
+
+---
+
 ## 2026-07-11 — Railway-Safe Demo User Seeder
 
 **Summary:** Added a narrow Railway-safe demo-user seeder that only creates or updates the 11 documented Phase 9F users, requires an explicit `MONGODB_URI`, avoids localhost fallback, preserves the intended inactive viewer account, and clears demo-user login/reset/session state without touching operational asset data.
