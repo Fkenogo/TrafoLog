@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-07-11 — Railway-Safe Phase 9F Reference Seeder
+
+**Summary:** Added a narrow, idempotent Railway preview seeder for only the three Phase 9F territories (`P9FC`, `P9FE`, `P9FW`) and five service areas (`P9FSA1`–`P9FSA5`) required by the Railway demo-user seeder. It requires an explicit `MONGODB_URI`, reconciles by canonical code, preserves document identity and unrelated metadata, performs no deletes, and exits non-zero if any required reference fails.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `scripts/seedRailwayPhase9FReferences.js` | Added model-backed, code-keyed reconciliation limited to eight canonical Phase 9F references |
+| `src/tests/seedRailwayPhase9FReferences.test.js` | Added focused coverage for database targeting, exact records, relationships, idempotency, isolation, preservation, and dependency failure |
+| `docs/superpowers/specs/2026-07-11-railway-phase9f-reference-seeder-design.md` | Recorded the approved safety design and schema investigation |
+| `docs/superpowers/plans/2026-07-11-railway-phase9f-reference-seeder.md` | Recorded the TDD implementation and delivery plan |
+| `docs/superpowers/reports/2026-07-11-railway-phase9f-reference-seeder.md` | Recorded implementation scope, verification evidence, risks, rollback, and later Railway procedure |
+
+### Later Railway execution order
+
+Run the reference seeder first and require `FAILED=0` before running the user seeder:
+
+```bash
+railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayPhase9FReferences.js'
+
+railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayDemoUsers.js'
+```
+
+Expected first execution against a database missing all eight references:
+
+```text
+CREATED P9FC
+CREATED P9FE
+CREATED P9FW
+CREATED P9FSA1
+CREATED P9FSA2
+CREATED P9FSA3
+CREATED P9FSA4
+CREATED P9FSA5
+Summary: CREATED=8 UPDATED=0 SKIPPED=0 FAILED=0
+```
+
+Existing canonical records may instead report `UPDATED` or `SKIPPED`. Stop if `FAILED` is non-zero.
+
+> **Warning:** Do not run `node scripts/phase9fSeedData.js` against the Railway preview database. It is a broad validation seed that modifies operational and demo collections outside this narrow reference-data scope.
+
+### Validation
+
+- `node --check scripts/seedRailwayPhase9FReferences.js`: passed.
+- Focused reference-seeder suite: 9 tests passed.
+- Existing Railway demo-user suite: 9 tests passed.
+- Full backend suite: 13 suites and 202 tests passed.
+- Frontend production build: passed with the existing Vite chunk-size warning.
+- Neither Railway seeder was executed during implementation.
+
+**Report:** `docs/superpowers/reports/2026-07-11-railway-phase9f-reference-seeder.md`
+
+---
+
 ## 2026-07-11 — QRCode Model Import Casing Fix
 
 **Summary:** Fixed the `OverwriteModelError: Cannot overwrite QRCode model once compiled` failure exposed by the full Jest run. All local imports now use the physical Linux-safe filename `QrCode.js`; the Mongoose model name remains `QRCode` and production QR behavior is unchanged.
