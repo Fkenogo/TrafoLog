@@ -10,6 +10,8 @@ const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const { createServer } = require('http');
 const cookieParser = require('cookie-parser');
+const { resolveClientOrigin } = require('./config/clientOrigin');
+const { configureProxyTrust } = require('./config/proxyTrust');
 
 // Config
 const database = require('./config/database');
@@ -33,9 +35,11 @@ const OverloadDetector = require('./jobs/overloadDetection');
 class App {
   constructor() {
     this.app = express();
+    configureProxyTrust(this.app);
     this.server = createServer(this.app);
     this.port = process.env.PORT || 3000;
     this.isTestRuntime = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+    this.clientOrigin = resolveClientOrigin();
     
     this.setupMiddleware();
     this.setupSwagger();
@@ -59,14 +63,14 @@ class App {
           styleSrc: ["'self'", "'unsafe-inline'"],
           scriptSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'", process.env.CLIENT_URL]
+          connectSrc: ["'self'", this.clientOrigin]
         }
       }
     }));
     
     // CORS
     this.app.use(cors({
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      origin: this.clientOrigin,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -240,7 +244,7 @@ class App {
    */
   setupWebSocket() {
     try {
-      this.wsManager = new WebSocketManager(this.server);
+      this.wsManager = new WebSocketManager(this.server, this.clientOrigin);
       
       // Make WebSocket manager available to services
       this.app.set('wsManager', this.wsManager);

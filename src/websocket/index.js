@@ -4,12 +4,13 @@ const User = require('../models/User');
 const NotificationHandler = require('./notificationHandler');
 const SyncHandler = require('./syncHandler');
 const { logger } = require('../utils/logger');
+const { resolveClientOrigin } = require('../config/clientOrigin');
 
 class WebSocketManager {
-  constructor(server) {
+  constructor(server, clientOrigin = resolveClientOrigin()) {
     this.io = new Server(server, {
       cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:5173',
+        origin: clientOrigin,
         methods: ['GET', 'POST'],
         credentials: true
       },

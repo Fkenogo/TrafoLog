@@ -160,14 +160,36 @@ The backend CORS origin is controlled by:
 CLIENT_URL=https://<frontend-service>.up.railway.app
 ```
 
-Set `CLIENT_URL` to the exact frontend origin, including `https://` and no trailing slash. This variable is also used by:
+Set `CLIENT_URL` to the exact frontend origin. A root trailing slash is normalized, but paths, queries, fragments, credentials, malformed URLs, non-HTTP(S) schemes, and loopback hosts are rejected. In production the backend now fails startup when `CLIENT_URL` is missing, empty, or unsafe instead of falling back to localhost.
+
+For the current Railway frontend, the required backend value is:
+
+```text
+CLIENT_URL=https://imaginative-art-production-53f9.up.railway.app
+```
+
+This variable is also used by:
 
 - Express CORS credentials configuration.
 - Socket.IO CORS configuration.
 - Helmet CSP `connect-src`.
 - Email/reset URL generation.
 
-If the frontend Railway URL changes, update backend `CLIENT_URL` and redeploy the backend.
+If the frontend Railway URL changes, update backend `CLIENT_URL` and redeploy the backend. Keep a single production origin; do not add localhost to the Railway value.
+
+### Railway reverse-proxy trust
+
+Railway terminates public HTTPS at its edge proxy and forwards the request to the TrafoLog deployment. In production, the backend therefore configures Express with exactly one trusted proxy hop:
+
+```js
+app.set('trust proxy', 1);
+```
+
+This setting is applied immediately after Express creates the app and before logging, rate limiting, or routes are registered. It allows `express-rate-limit`, authentication session records, audit logs, and error logs to use the client address supplied by the nearest Railway proxy. Development and test environments retain Express's default `trust proxy = false` and do not trust arbitrary forwarded headers.
+
+Do not change the value to `true`. A numeric value of `1` matches the current client-to-Railway-edge-to-service path and prevents an attacker-supplied extra leftmost `X-Forwarded-For` entry from becoming `req.ip`. If another CDN or proxy is added in front of Railway, review the complete request path and trust model before changing this setting.
+
+No additional Railway variable is required for proxy trust.
 
 ## 8. Cookie/Auth Notes
 
@@ -259,6 +281,20 @@ https://<frontend-service>.up.railway.app
 8. Confirm `viewer2@phase9f.io` is rejected while inactive.
 9. Avoid real restore execution. If restore UI is inspected, use dry-run only with seeded preview data.
 
+For the current deployment, also verify:
+
+```text
+GET https://trafolog-production.up.railway.app/health
+OPTIONS https://trafolog-production.up.railway.app/api/auth/login
+POST https://trafolog-production.up.railway.app/api/auth/login
+```
+
+- Health reports `status: healthy`, `database: connected`, `redis: connected`, and `websocket: running`.
+- The login preflight from `https://imaginative-art-production-53f9.up.railway.app` returns `204` with that exact allowed origin and credentials enabled.
+- A valid demo login succeeds; the POST must not return `500`.
+- TrafoLog deploy logs contain no `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` after the new deployment.
+- In a controlled preview-only check, repeated failed login attempts from one client still produce `429` after the configured five-attempt limit. Perform this after valid-login verification or from a separate client so the 15-minute limiter window does not block the demo login.
+
 ## 12. Local Validation Before Deployment
 
 Run locally before pushing/deploying:
@@ -280,6 +316,7 @@ These commands require local MongoDB, Redis, backend, and frontend availability 
 |---|---|
 | Backend health returns `503` | Confirm `MONGODB_URI` and `REDIS_URL` are set on the backend service and point to Railway services. |
 | Browser CORS error | Confirm backend `CLIENT_URL` exactly matches the frontend Railway origin with no trailing slash. Redeploy backend after changing it. |
+| Login returns `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | Confirm the deployed revision includes production-only `trust proxy = 1`; do not disable limiter validation or use `trust proxy = true`. |
 | Frontend calls its own `/api` path | Confirm frontend `VITE_API_BASE_URL` is set to `https://<backend-service>.up.railway.app/api`, then rebuild/redeploy frontend. |
 | Login works but refresh/logout behaves inconsistently | Review the cookie/auth notes. Separate Railway hostnames plus `sameSite=strict` can affect cookie-backed flows. |
 | Seed scripts affect the wrong database | Stop immediately and verify exported `MONGODB_URI`. Use preview-only Railway MongoDB. |
@@ -300,4 +337,3 @@ To avoid ongoing Railway charges after the temporary preview:
 8. Confirm the project no longer shows active services or usage.
 
 If keeping the project for later, remove public domains from backend/frontend services and stop the services.
-

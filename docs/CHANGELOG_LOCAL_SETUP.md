@@ -2,6 +2,76 @@
 
 ---
 
+## 2026-07-13 — Railway Reverse-Proxy Trust and Rate-Limit Fix
+
+**Summary:** Configured Express to trust exactly one proxy hop in production so Railway-forwarded client addresses are accepted by `express-rate-limit`. Development and tests retain the default untrusted-proxy behavior. Removed four auth-limiter validation suppressions now that proxy trust is configured correctly; rate limits, thresholds, credentials, cookies, and authentication behavior remain unchanged.
+
+### Root cause and fix
+
+Railway terminates HTTPS at its edge and forwards `X-Forwarded-For` to TrafoLog. Express still used its default `trust proxy = false`, so the global `/api` limiter rejected the forwarded header with `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` before the login controller ran. The App now applies production-only `trust proxy = 1` immediately after `express()` and before middleware registration. Numeric one-hop trust selects the nearest Railway-provided address rather than an attacker-controlled extra leftmost value; `trust proxy = true` is not used.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `src/config/proxyTrust.js` | Added the production-one-hop/development-disabled Express trust rule |
+| `src/app.js` | Applied proxy trust immediately after Express app creation |
+| `src/middleware/authRateLimiter.js` | Removed `X-Forwarded-For` validation suppressions while preserving all limiter policies |
+| `src/tests/proxyTrust.test.js` | Added production proxy, spoof resistance, local safety, CORS, login, IP, limiter, refresh, and health coverage |
+| `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md` | Documented Railway proxy architecture, security implications, and post-deploy checks |
+| `docs/superpowers/reports/2026-07-12-production-client-origin-cors.md` | Expanded the combined CORS/proxy implementation evidence and rollback report |
+
+### Validation
+
+- Syntax checks passed for App, both configuration helpers, and auth limiters.
+- Focused CORS suite: 18/18 passed.
+- Focused proxy suite: 9/9 passed.
+- Authentication suite: 9/9 passed.
+- Initial full run: 13/15 suites passed; transformer/admin setup hooks timed out after service connection. Both passed unchanged in isolation (30/30 and 36/36), confirming nondeterministic fixture contention.
+- Clean full backend rerun: 15/15 suites and 229/229 tests passed.
+- Frontend TypeScript/Vite production build passed with the existing chunk-size warning.
+- No dependency, frontend, cookie, auth route, credential, or Railway service change was made.
+
+**Report:** `docs/superpowers/reports/2026-07-12-production-client-origin-cors.md`
+
+---
+
+## 2026-07-12 — Production-Safe Client Origin CORS Configuration
+
+**Summary:** Centralized backend `CLIENT_URL` resolution so Express CORS, Socket.IO CORS, and Helmet CSP share one normalized origin. Development retains the localhost default. Production now rejects missing, malformed, path-bearing, credential-bearing, or loopback values instead of silently authorizing localhost. Credentialed CORS and the single-origin security model are preserved.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `src/config/clientOrigin.js` | Added the shared origin parser, normalizer, development fallback, and production safety validation |
+| `src/app.js` | Reused one resolved origin for Express CORS, Helmet CSP, and WebSocket construction |
+| `src/websocket/index.js` | Accepted the resolved application origin for credentialed Socket.IO CORS |
+| `src/tests/clientOriginCors.test.js` | Added focused resolver, loopback, preflight, credentials, CSP, and shared-wiring coverage |
+| `.env.example` | Documented development and production `CLIENT_URL` rules |
+| `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md` | Added the exact Railway frontend origin and fail-fast deployment guidance |
+| `docs/superpowers/reports/2026-07-12-production-client-origin-cors.md` | Added implementation, validation, risk, rollback, and deployment-gate evidence |
+
+### Required Railway backend variable
+
+```text
+CLIENT_URL=https://imaginative-art-production-53f9.up.railway.app
+```
+
+The value was confirmed on the Railway TrafoLog backend service before the combined CORS/proxy delivery. The implementation intentionally fails production startup for a missing or loopback `CLIENT_URL`.
+
+### Validation status
+
+- Focused CORS suite: 18 tests passed.
+- Syntax checks: passed for the resolver, App, and WebSocket modules.
+- Frontend production build: passed with the existing Vite chunk-size warning.
+- Exact full backend `npm test`: 15 suites and 229 tests passed after the requested isolation of two nondeterministic fixture setup timeouts.
+- Railway backend `CLIENT_URL` confirmation and the clean-suite delivery gates are satisfied.
+
+**Report:** `docs/superpowers/reports/2026-07-12-production-client-origin-cors.md`
+
+---
+
 ## 2026-07-11 — Railway-Safe Phase 9F Reference Seeder
 
 **Summary:** Added a narrow, idempotent Railway preview seeder for only the three Phase 9F territories (`P9FC`, `P9FE`, `P9FW`) and five service areas (`P9FSA1`–`P9FSA5`) required by the Railway demo-user seeder. It requires an explicit `MONGODB_URI`, reconciles by canonical code, preserves document identity and unrelated metadata, performs no deletes, and exits non-zero if any required reference fails.

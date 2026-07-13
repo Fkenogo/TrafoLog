@@ -10,8 +10,7 @@ const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true,
-  validate: { xForwardedForHeader: false } // ✨ Fixes the IPv6 validation crash
+  skipSuccessfulRequests: true
 });
 
 // Rate limiter for registration
@@ -23,8 +22,7 @@ const registerLimiter = rateLimit({
     message: 'Too many registration attempts. Please try again later.'
   },
   standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false } // ✨ Fixes the IPv6 validation crash
+  legacyHeaders: false
 });
 
 // Rate limiter for password reset requests
@@ -36,8 +34,7 @@ const passwordResetLimiter = rateLimit({
     message: 'Too many password reset requests. Please try again later.'
   },
   standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false }
+  legacyHeaders: false
 });
 
 // Rate limiter for email verification
@@ -49,8 +46,7 @@ const verificationLimiter = rateLimit({
     message: 'Too many verification requests. Please try again later.'
   },
   standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false }
+  legacyHeaders: false
 });
 
 module.exports = {
