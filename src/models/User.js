@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { resolveAuthConfig } = require('../config/auth');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -177,18 +178,20 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 
 userSchema.methods.generateAuthToken = function() {
   const jwt = require('jsonwebtoken');
+  const { jwtSecret } = resolveAuthConfig();
   return jwt.sign(
     { id: this._id, email: this.email, role: this.role },
-    process.env.JWT_SECRET,
+    jwtSecret,
     { expiresIn: process.env.JWT_EXPIRY || '7d' }
   );
 };
 
 userSchema.methods.generateRefreshToken = function() {
   const jwt = require('jsonwebtoken');
+  const { refreshTokenSecret } = resolveAuthConfig();
   return jwt.sign(
     { id: this._id },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+    refreshTokenSecret,
     { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '30d' }
   );
 };

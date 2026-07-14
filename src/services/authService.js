@@ -65,6 +65,10 @@ class AuthService extends BaseService {
    * Login user
    */
   async login(email, password, userAgent, ipAddress) {
+    let stage = 'auth.login.lookup_user';
+    let persistedRefreshToken = null;
+    let persistedSession = null;
+
     try {
       // Find user
       const user = await this.model.findOne({ email }).select('+password');
@@ -83,24 +87,22 @@ class AuthService extends BaseService {
       }
 
       // Verify password
+      stage = 'auth.login.verify_password';
       const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
         await user.incrementLoginAttempts();
         throw new ApiError(401, 'Invalid email or password');
       }
 
-      // Reset login attempts on successful login
-      await user.resetLoginAttempts();
-
-      // Update last login
-      user.last_login = new Date();
-      await user.save();
-
-      // Generate tokens
+      // Issue both tokens before mutating successful-login state.
+      stage = 'auth.login.issue_access_token';
       const accessToken = user.generateAuthToken();
+
+      stage = 'auth.login.issue_refresh_token';
       const refreshToken = user.generateRefreshToken();
 
       // Store refresh token
+      stage = 'auth.login.persist_refresh_token';
       const refreshTokenDoc = new RefreshToken({
         user_id: user._id,
         token: refreshToken,
@@ -109,8 +111,10 @@ class AuthService extends BaseService {
         ip_address: ipAddress
       });
       await refreshTokenDoc.save();
+      persistedRefreshToken = refreshTokenDoc;
 
       // Create session
+      stage = 'auth.login.create_session';
       const sessionToken = crypto.randomBytes(32).toString('hex');
       const session = new Session({
         user_id: user._id,
@@ -120,8 +124,17 @@ class AuthService extends BaseService {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       });
       await session.save();
+      persistedSession = session;
+
+      // Persist successful-login fields together after auth artifacts exist.
+      stage = 'auth.login.update_user';
+      user.login_attempts = 0;
+      user.lock_until = undefined;
+      user.last_login = new Date();
+      await user.save({ validateBeforeSave: false });
 
       // Log login
+      stage = 'auth.login.audit_success';
       await this.logAction({
         user_id: user._id,
         action: 'LOGIN',
@@ -138,8 +151,64 @@ class AuthService extends BaseService {
       };
     } catch (error) {
       if (error instanceof ApiError) throw error;
-      logger.error('Error in AuthService.login:', error);
+
+      await this.cleanupFailedLoginArtifacts({
+        refreshToken: persistedRefreshToken,
+        session: persistedSession
+      });
+
+      const validationFields = error?.errors
+        ? Object.keys(error.errors)
+        : undefined;
+      const safeMessage = stage === 'auth.login.issue_access_token'
+        && error?.message === 'secretOrPrivateKey must have a value'
+        ? 'JWT signing secret is unavailable'
+        : `Unexpected failure during ${stage}`;
+      const stackFrames = typeof error?.stack === 'string'
+        ? error.stack.split('\n').slice(1)
+        : [];
+      const diagnostic = {
+        stage,
+        error: {
+          name: error?.name || 'Error',
+          code: error?.code,
+          message: safeMessage,
+          validationFields,
+          stack: stackFrames.length
+            ? `${error?.name || 'Error'}: ${safeMessage}\n${stackFrames.join('\n')}`
+            : undefined
+        }
+      };
+
+      logger.error('Auth login stage failed', diagnostic);
+      if (process.env.NODE_ENV === 'production') {
+        console.error(JSON.stringify({
+          event: 'auth.login.failure',
+          ...diagnostic
+        }));
+      }
       throw new ApiError(500, 'Failed to login');
+    }
+  }
+
+  async cleanupFailedLoginArtifacts({ refreshToken, session }) {
+    const cleanupOperations = [];
+
+    if (session?._id) {
+      cleanupOperations.push(Session.deleteOne({ _id: session._id }));
+    }
+    if (refreshToken?._id) {
+      cleanupOperations.push(RefreshToken.deleteOne({ _id: refreshToken._id }));
+    }
+
+    if (!cleanupOperations.length) return;
+
+    const results = await Promise.allSettled(cleanupOperations);
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) {
+      logger.error('Auth login artifact cleanup failed', {
+        failedOperations: failures.length
+      });
     }
   }
 

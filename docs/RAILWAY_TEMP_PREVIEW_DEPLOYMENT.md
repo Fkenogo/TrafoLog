@@ -118,6 +118,8 @@ ALLOWED_FILE_TYPES
 
 Do not set real SMTP, Twilio, MinIO, or production backup credentials for a temporary preview unless that integration is intentionally being validated with preview-only accounts.
 
+`JWT_SECRET` is mandatory. TrafoLog validates it during startup and production rejects a missing, empty, or documented placeholder value. `JWT_REFRESH_SECRET` remains optional; when it is absent, the established authentication design signs refresh tokens with `JWT_SECRET`. Never print either secret in deploy logs or commit it to the repository.
+
 ## 6. Frontend Service Setup
 
 Service root: `/frontend`.
@@ -210,16 +212,19 @@ For Railway preview on separate frontend/backend `*.up.railway.app` hostnames:
 
 ## 9. Seed Data Commands
 
-Run these against the Railway backend environment after MongoDB is connected and before demo testing:
+Run the narrow reference seeder first against the Railway preview database:
 
 ```bash
-node scripts/phase9fSeedData.js
-node scripts/resetDemoPasswords.js
+railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayPhase9FReferences.js'
 ```
 
-Run them from a Railway shell/job or from a trusted local terminal with the Railway preview `MONGODB_URI` exported. Do not point them at production data.
+Require its final summary to report `FAILED=0`. Only then run the narrow demo-user seeder:
 
-The seed script refreshes records with Phase 9F prefixes and demo-user emails. The password reset script resets all demo accounts to the documented default.
+```bash
+railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayDemoUsers.js'
+```
+
+Do not run `scripts/phase9fSeedData.js` against the existing Railway preview database; it touches wider demo and operational collections. Do not run `scripts/resetDemoPasswords.js`; the narrow Railway user seeder creates or reconciles only the documented accounts and resets their documented preview passwords itself.
 
 ## 10. Demo Users
 
@@ -308,7 +313,7 @@ cd frontend && npm run build
 cd .. && npm test
 ```
 
-These commands require local MongoDB, Redis, backend, and frontend availability where applicable.
+These commands are for a disposable local environment only and require local MongoDB, Redis, backend, and frontend availability where applicable. They are not Railway preview seed instructions; use the narrow two-step sequence in section 9 for Railway.
 
 ## 13. Troubleshooting
 
@@ -317,6 +322,7 @@ These commands require local MongoDB, Redis, backend, and frontend availability 
 | Backend health returns `503` | Confirm `MONGODB_URI` and `REDIS_URL` are set on the backend service and point to Railway services. |
 | Browser CORS error | Confirm backend `CLIENT_URL` exactly matches the frontend Railway origin with no trailing slash. Redeploy backend after changing it. |
 | Login returns `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | Confirm the deployed revision includes production-only `trust proxy = 1`; do not disable limiter validation or use `trust proxy = true`. |
+| Login reaches `AuthService.login` but returns `500` during token issuance | Confirm the TrafoLog service has a non-placeholder `JWT_SECRET`. The backend now fails startup clearly instead of accepting an unusable signing configuration. |
 | Frontend calls its own `/api` path | Confirm frontend `VITE_API_BASE_URL` is set to `https://<backend-service>.up.railway.app/api`, then rebuild/redeploy frontend. |
 | Login works but refresh/logout behaves inconsistently | Review the cookie/auth notes. Separate Railway hostnames plus `sameSite=strict` can affect cookie-backed flows. |
 | Seed scripts affect the wrong database | Stop immediately and verify exported `MONGODB_URI`. Use preview-only Railway MongoDB. |

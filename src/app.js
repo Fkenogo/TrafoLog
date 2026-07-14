@@ -12,6 +12,7 @@ const { createServer } = require('http');
 const cookieParser = require('cookie-parser');
 const { resolveClientOrigin } = require('./config/clientOrigin');
 const { configureProxyTrust } = require('./config/proxyTrust');
+const { validateAuthConfig } = require('./config/auth');
 
 // Config
 const database = require('./config/database');
@@ -36,6 +37,7 @@ class App {
   constructor() {
     this.app = express();
     configureProxyTrust(this.app);
+    validateAuthConfig();
     this.server = createServer(this.app);
     this.port = process.env.PORT || 3000;
     this.isTestRuntime = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);

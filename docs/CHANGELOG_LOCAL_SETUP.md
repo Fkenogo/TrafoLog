@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-07-13 — Railway JWT Login Configuration and Failure Safety
+
+**Summary:** Confirmed that Railway demo login reached `AuthService.login` but failed while issuing the access token because the TrafoLog service had no `JWT_SECRET`. Added centralized JWT configuration validation, production placeholder rejection, secret-safe stage diagnostics, and mutation-safe login ordering. Token issuance now happens before successful-login state changes, and only auth artifacts created by the current failed attempt are compensated if a later stage fails.
+
+### Root cause and fix
+
+The Railway target user existed, was active, and passed password comparison. `User.generateAuthToken()` then called `jsonwebtoken.sign()` without a signing key and threw `Error: secretOrPrivateKey must have a value`. Because the old service reset login attempts and saved `last_login` first, the HTTP 500 partially changed the user even though no session, refresh token, or login audit was created.
+
+The App now validates JWT configuration during startup, User token methods share that resolver, and the login orchestration issues both tokens before persisting success state. Unexpected login failures record a sanitized stage and stack frames in server logs without passwords, tokens, secrets, cookies, or connection URLs.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `src/config/auth.js` | Added required-secret resolution, refresh-secret fallback, and production placeholder rejection |
+| `src/app.js` | Added fail-fast auth configuration validation during app construction |
+| `src/models/User.js` | Reused the centralized secrets for access and refresh token signing |
+| `src/services/authService.js` | Added staged diagnostics, token-first ordering, one-save success state, and attempt-scoped artifact compensation |
+| `src/tests/authConfig.test.js` | Added resolver and real production-startup failure coverage |
+| `src/tests/authLoginRegression.test.js` | Added the real-model missing-secret/no-partial-state regression |
+| `.env.example` | Documented the mandatory, non-placeholder production JWT secret |
+| `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md` | Corrected preview seed commands and documented JWT startup validation |
+
+### Railway requirement
+
+The TrafoLog backend requires a strong preview-only `JWT_SECRET`. `JWT_REFRESH_SECRET` is not newly required because the current architecture intentionally falls back to the required JWT secret.
+
+### Validation
+
+- New auth configuration suite: 5/5 passed.
+- New login regression suite: 4/4 passed.
+- Existing authentication suite: 9/9 passed.
+- Existing CORS suite: 18/18 passed.
+- Existing proxy/rate-limit suite: 9/9 passed.
+- Full backend with external SMTP disabled for the test process: 17/17 suites and 238/238 tests passed.
+- The unmodified local `.env` run timed out in registration-heavy fixtures because configured external SMTP was awaited; the audit suite changed from a deterministic 30-second timeout to 10/10 passing in 3.3 seconds when using the application's existing no-SMTP path. No email code, fixture, or timeout was changed.
+- Frontend TypeScript/Vite production build passed with the existing chunk-size warning.
+
+**Report:** `docs/superpowers/reports/2026-07-13-railway-auth-login-failure.md`
+
+---
+
 ## 2026-07-13 — Railway Reverse-Proxy Trust and Rate-Limit Fix
 
 **Summary:** Configured Express to trust exactly one proxy hop in production so Railway-forwarded client addresses are accepted by `express-rate-limit`. Development and tests retain the default untrusted-proxy behavior. Removed four auth-limiter validation suppressions now that proxy trust is configured correctly; rate limits, thresholds, credentials, cookies, and authentication behavior remain unchanged.
