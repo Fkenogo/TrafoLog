@@ -112,3 +112,25 @@ Rollback: revert the delivery commit and redeploy. Keep the Railway `JWT_SECRET`
 ## Secret-handling confirmation
 
 No live supplied password, password hash, access token, refresh token, JWT secret, cookie, MongoDB URI, or Redis URL was written to repository files, command output, logs captured for this report, or client responses. The regression suite uses only its own synthetic test credential.
+
+## Git and post-deployment verification
+
+Implementation commit:
+
+```text
+aa0d439fa28dd7d3f42ef5563d9164433db6ecf7 Fix Railway demo login failure
+```
+
+GitHub `origin/main` was independently verified at that commit before deployment checks. Railway deployment `461a72c6-644e-4824-acaa-10c9f1f35517` reported `SUCCESS` for the exact implementation commit.
+
+Live results:
+
+- `GET /health`: 200; status healthy; MongoDB connected; Redis connected; WebSocket running.
+- Approved-frontend `OPTIONS /api/auth/login`: 204 with the exact Railway frontend origin and credentials enabled.
+- `POST /api/auth/login` for `super.admin@phase9f.io`: 200; success true; access token returned; refresh and session cookies returned. Token/cookie values were held only in process memory and not printed.
+- Cookie-backed `POST /api/auth/refresh`: 200; a new access token was returned.
+- Inactive `viewer2@phase9f.io` login: 401 with `Account is deactivated`.
+- Rate limit: five failed credential requests to a nonexistent valid-format email returned 401 with remaining counts 4, 3, 2, 1, 0; the sixth returned 429. No real user was locked or modified.
+- Current deployment log matches: zero for `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`, zero for `secretOrPrivateKey must have a value`, and zero for the sanitized `auth.login.failure` event.
+
+A final read-only live Session/RefreshToken/AuditLog count was attempted twice through Railway's public MongoDB endpoint, but both attempts returned `MongooseServerSelectionError`. No database result is inferred from that failure. Exact single-login cardinality and preservation of pre-existing auth artifacts are covered by the green real-model regression suite; live artifact counts remain unverified due solely to public endpoint connectivity.
