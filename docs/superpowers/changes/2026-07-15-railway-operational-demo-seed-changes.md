@@ -1,7 +1,7 @@
 # Railway Operational Demo Seed — Running Changes
 
-**Date:** 2026-07-15  
-**Railway execution:** Dry-run and live gate completed under separate authorization on 2026-07-16  
+**Date:** 2026-07-15
+**Railway execution:** Dry-run and live gate completed under separate authorization on 2026-07-16
 **Commit/push:** Not authorized and not performed
 
 ## Concurrent-agent loss and planning

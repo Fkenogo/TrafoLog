@@ -1,8 +1,8 @@
 # Transformer Test Setup Timeout — Investigation and Fix
 
-**Date:** 2026-07-16  
-**Scope:** Test infrastructure only  
-**Railway changes:** None  
+**Date:** 2026-07-16
+**Scope:** Test infrastructure only
+**Railway changes:** None
 **Commit/push:** Not performed
 
 ## Symptom

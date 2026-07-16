@@ -1,8 +1,8 @@
 # Railway Operational Demo Seed — Audit and Fix Report
 
-**Date:** 2026-07-15  
-**Project:** Railway `sunny-creation`, production environment  
-**Railway execution:** Dry-run and live gate completed under separate authorization on 2026-07-16  
+**Date:** 2026-07-15
+**Project:** Railway `sunny-creation`, production environment
+**Railway execution:** Dry-run and live gate completed under separate authorization on 2026-07-16
 **Commit/push:** Not performed; not authorized
 
 ## Audit conclusion
