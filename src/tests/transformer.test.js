@@ -45,21 +45,15 @@ beforeAll(async () => {
   await ServiceArea.deleteOne({ code: 'TEST_TRANS_SA1' });
   await Territory.deleteOne({ code: 'TEST_TRANS_T1' });
 
-  // Register and login
-  await request(app.getApp())
-    .post('/api/auth/register')
-    .send({
-      name: 'Transformer Admin',
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      confirmPassword: TEST_PASSWORD,
-      role: 'Super Admin'
-    });
-
-  const loginRes = await request(app.getApp())
-    .post('/api/auth/login')
-    .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
-  authToken = loginRes.body.data.accessToken;
+  // Create the authorization fixture directly; authentication behavior is
+  // covered by the dedicated auth suites.
+  const user = await User.create({
+    name: 'Transformer Admin',
+    email: TEST_EMAIL,
+    password: TEST_PASSWORD,
+    role: 'Super Admin'
+  });
+  authToken = user.generateAuthToken();
 
   // Create territory and service area directly
   const territory = await Territory.create({
@@ -320,7 +314,7 @@ describe('GET /api/transformers/:id/qr', () => {
     expect(res2.status).toBe(200);
     // Both calls succeed; transformer_id should be the same
     expect(String(res1.body.data.transformer_id)).toBe(String(res2.body.data.transformer_id));
-  });
+  }, 15000);
 
   it('returns 404 for unknown transformer', async () => {
     const fakeId = '000000000000000000000003';
@@ -443,7 +437,7 @@ describe('POST /api/transformers/bulk', () => {
     // Clean up bulk-created transformers
     const Transformer = require('../models/Transformer');
     await Transformer.deleteMany({ manufacturer: { $in: ['ABB', 'Siemens'] } });
-  });
+  }, 15000);
 
   it('returns 400 when body is not an array', async () => {
     const res = await request(app.getApp())

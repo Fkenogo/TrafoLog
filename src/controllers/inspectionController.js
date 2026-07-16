@@ -1,6 +1,15 @@
 const InspectionService = require('../services/inspectionService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
+const populatedTransformer = {
+  path: 'transformer_id',
+  populate: [
+    { path: 'location_operational.territory_id', select: 'name code' },
+    { path: 'location_operational.service_area_id', select: 'name code' },
+    { path: 'location_operational.feeder_id', select: 'name code' }
+  ]
+};
+
 class InspectionController {
   /**
    * Log inspection
@@ -46,7 +55,7 @@ class InspectionController {
    */
   async getById(req, res, next) {
     try {
-      const inspection = await InspectionService.getById(req.params.id, ['transformer_id', 'inspector_id']);
+      const inspection = await InspectionService.getById(req.params.id, [populatedTransformer, 'inspector_id']);
       return successResponse(res, 200, 'Inspection retrieved successfully', inspection);
     } catch (error) {
       next(error);
@@ -91,7 +100,7 @@ class InspectionController {
         page: parseInt(page),
         limit: parseInt(limit),
         sort: { inspection_date: -1 },
-        populate: ['inspector_id']
+        populate: [populatedTransformer, 'inspector_id']
       });
 
       return successResponse(res, 200, 'Inspections retrieved successfully', result);

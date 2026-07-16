@@ -3,8 +3,13 @@ import { maintenanceApi } from '../../api/maintenanceApi';
 import { ErrorState } from '../../components/common/ErrorState';
 import { Loading } from '../../components/common/Loading';
 import { DataTable } from '../../components/tables/DataTable';
-import { MaintenanceRecord } from '../../types/api';
+import { MaintenanceRecord, User } from '../../types/api';
 import { formatDate, getTransformerName } from '../../utils/format';
+
+function technicianName(value?: string | User, legacyName?: string) {
+  if (value && typeof value === 'object') return value.name || value.email || legacyName || 'Not assigned';
+  return legacyName || (value ? 'Assigned technician' : 'Not assigned');
+}
 
 export function MaintenancePage() {
   const query = useQuery({ queryKey: ['maintenance', 'list'], queryFn: () => maintenanceApi.list({ limit: 20 }) });
@@ -23,7 +28,7 @@ export function MaintenancePage() {
           <tr key={item._id}>
             <td>{getTransformerName(item.transformer_id)}</td>
             <td>{item.maintenance_type || 'Not recorded'}</td>
-            <td>{item.technician_name || 'Not assigned'}</td>
+            <td>{technicianName(item.technician_id, item.technician_name)}</td>
             <td>{formatDate(item.maintenance_date)}</td>
             <td>{formatDate(item.next_maintenance_date)}</td>
           </tr>

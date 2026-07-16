@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-07-15 — Railway-Safe Phase 9F Operational Demo Seeder
+
+**Summary:** Audited the live Railway preview and confirmed that its dashboard was empty because references and users existed while operational collections were empty. Added a dedicated model-backed operational reconciler with an explicit database target, read-only dry-run, complete dependency preflight, exact canonical keys, duplicate detection, UTC-relative dates, owned-field reconciliation, and preservation of unrelated data.
+
+### Dataset and scope
+
+- 5 districts and 7 feeders required by the existing five Phase 9F service areas.
+- 15 transformers with the approved 8 Active / 3 Faulty / 2 Under Maintenance / 1 Decommissioned / 1 Unverified mix.
+- 20 performed inspections, 7 faults, and 8 maintenance records.
+- No users, territories, service areas, QR codes, notifications, audit logs, sessions, refresh tokens, or persistent report records are created.
+
+### Changed
+
+| File | Change |
+|---|---|
+| `scripts/seedRailwayPhase9FOperationalData.js` | Added the narrow operational dataset, full preflight, dry-run, sequential idempotent reconciliation, safe output, and CLI exit contract |
+| `src/tests/seedRailwayPhase9FOperationalData.test.js` | Added real-Mongoose and authenticated API coverage in a dedicated local test database |
+| `src/controllers/inspectionController.js` | Populated linked transformer and nested operational reference data for inspection list/detail responses |
+| `src/controllers/faultController.js` | Populated nested transformer territory, service-area, and feeder references for fault list/detail responses |
+| `frontend/src/pages/maintenance/MaintenancePage.tsx` | Displayed the populated technician business identity with legacy-name fallback |
+| `docs/RAILWAY_TEMP_PREVIEW_DEPLOYMENT.md` | Added the operational dry-run/live approval sequence, scope, rerun, and rollback guidance |
+| `docs/superpowers/specs/2026-07-15-railway-operational-demo-seed-design.md` | Recorded the approved audit and design |
+| `docs/superpowers/plans/2026-07-15-railway-operational-demo-seed.md` | Recorded the test-first execution plan and exact owned fields |
+| Quarantine evidence | The wrong concurrent agent removed the untracked rejected implementation and its untracked inspection report before either could be preserved; neither file is present or reconstructed |
+| `docs/superpowers/reports/2026-07-15-railway-operational-demo-seed-audit-and-fix.md` | Recorded implementation and validation evidence |
+| `docs/superpowers/changes/2026-07-15-railway-operational-demo-seed-changes.md` | Maintained the running task log |
+
+### Safety behavior
+
+- `MONGODB_URI` is required and has no localhost fallback.
+- Dry-run uses `autoIndex:false` and `autoCreate:false` and performs no document, timestamp, collection, or index writes.
+- All reference/user dependencies, parent mappings, canonical matches, and candidate model validation complete before normal writes begin.
+- Existing users are read and validated but never saved. The inactive viewer remains inactive.
+- Existing territories and service areas are reused without updates.
+- No delete, drop, replacement, or broad update method exists in the production script.
+- Partial normal-run failures exit non-zero; exact-key rerun is the recovery path.
+
+### Validation
+
+- Focused operational suite: 24/24 passed, including real authenticated dashboard/module/map/report endpoints.
+- Reference suite: 9/9 passed.
+- Demo-user suite: 9/9 passed.
+- Transformer suite: 30/30 passed.
+- Inspection suite: 14/14 passed.
+- Fault suite: 20/20 passed with the established `SMTP_HOST=` test override.
+- Analytics suite: 7/7 passed.
+- Auth suite: 9/9 passed.
+- Frontend TypeScript/Vite production build passed with the existing chunk-size warning.
+- Railway dry-run later reported `WOULD_CREATE=62 WOULD_UPDATE=0 WOULD_SKIP=0 FAILED=0`. Under a separate live gate, the first run reported `CREATED=62 UPDATED=0 SKIPPED=0 FAILED=0`, the same-day rerun reported `CREATED=0 UPDATED=0 SKIPPED=62 FAILED=0`, all orphan checks were zero, and live dashboard/module/map/report GET validation passed. Authentication state and Railway configuration remained unchanged. No commit or push occurred.
+- Final UI binding review confirmed Dashboard, Transformers, and Asset Map already consume seeded business values. Inspection and fault APIs now return the linked transformer/reference values required by their tables, and Maintenance renders populated `technician_id` names instead of ignoring them.
+
+**Report:** `docs/superpowers/reports/2026-07-15-railway-operational-demo-seed-audit-and-fix.md`
+
+---
+
 ## 2026-07-13 — Railway JWT Login Configuration and Failure Safety
 
 **Summary:** Confirmed that Railway demo login reached `AuthService.login` but failed while issuing the access token because the TrafoLog service had no `JWT_SECRET`. Added centralized JWT configuration validation, production placeholder rejection, secret-safe stage diagnostics, and mutation-safe login ordering. Token issuance now happens before successful-login state changes, and only auth artifacts created by the current failed attempt are compensated if a later stage fails.

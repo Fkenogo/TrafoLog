@@ -1,6 +1,15 @@
 const FaultService = require('../services/faultService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
+const populatedTransformer = {
+  path: 'transformer_id',
+  populate: [
+    { path: 'location_operational.territory_id', select: 'name code' },
+    { path: 'location_operational.service_area_id', select: 'name code' },
+    { path: 'location_operational.feeder_id', select: 'name code' }
+  ]
+};
+
 class FaultController {
   /**
    * Report fault
@@ -112,7 +121,7 @@ class FaultController {
         page: parseInt(page),
         limit: parseInt(limit),
         sort: { fault_date: -1 },
-        populate: ['transformer_id', 'inspection_id', 'assigned_to', 'reported_by']
+        populate: [populatedTransformer, 'inspection_id', 'assigned_to', 'reported_by']
       });
 
       return successResponse(res, 200, 'Faults retrieved successfully', result);
@@ -125,7 +134,7 @@ class FaultController {
     try {
       const fault = await FaultService.getById(
         req.params.id,
-        ['transformer_id', 'inspection_id', 'reported_by', 'assigned_to', 'resolved_by']
+        [populatedTransformer, 'inspection_id', 'reported_by', 'assigned_to', 'resolved_by']
       );
       return successResponse(res, 200, 'Fault retrieved successfully', fault);
     } catch (error) {

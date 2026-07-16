@@ -94,7 +94,7 @@ describe('GET /api/inspections', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.data.length).toBeGreaterThanOrEqual(1);
-    expect(String(res.body.data.data[0].transformer_id)).toBe(String(transformerId));
+    expect(String(res.body.data.data[0].transformer_id._id)).toBe(String(transformerId));
   });
 
   it('rejects unauthenticated request with 401', async () => {

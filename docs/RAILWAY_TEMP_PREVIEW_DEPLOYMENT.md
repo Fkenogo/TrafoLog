@@ -212,7 +212,7 @@ For Railway preview on separate frontend/backend `*.up.railway.app` hostnames:
 
 ## 9. Seed Data Commands
 
-Run the narrow reference seeder first against the Railway preview database:
+The Railway preview seed is deliberately split into three responsibilities. Run the narrow reference seeder first:
 
 ```bash
 railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayPhase9FReferences.js'
@@ -225,6 +225,39 @@ railway run --service MongoDB sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node script
 ```
 
 Do not run `scripts/phase9fSeedData.js` against the existing Railway preview database; it touches wider demo and operational collections. Do not run `scripts/resetDemoPasswords.js`; the narrow Railway user seeder creates or reconciles only the documented accounts and resets their documented preview passwords itself.
+
+The user seeder owns authentication state and should be rerun only when the documented demo users intentionally need reconciliation. The operational seeder never saves users and never writes sessions or refresh tokens.
+
+### Operational preview data
+
+After references and all 11 users are present in their documented role, assignment, and active/inactive state, run the operational seeder in dry-run mode first. For the 2026-07-16 delivery, this command was executed through a separate approved dry-run gate:
+
+```bash
+railway run --service MongoDB sh -c \
+  'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayPhase9FOperationalData.js --dry-run'
+```
+
+The MongoDB-service form is the established safe pattern for a locally initiated Railway one-off command because `MONGO_PUBLIC_URL` is reachable from the local runner. It maps the value to `MONGODB_URI` without printing it. A TrafoLog-service command may be used only when Railway confirms that its one-off environment exposes a reachable nonblank `MONGODB_URI`; check availability without displaying the value.
+
+Dry-run connects with automatic index and collection creation disabled, performs only reads, and reports `WOULD_CREATE`, `WOULD_UPDATE`, `WOULD_SKIP`, or `FAILED`. The approved Railway dry-run result was:
+
+```text
+Operational demo seed summary:
+WOULD_CREATE=62 WOULD_UPDATE=0 WOULD_SKIP=0 FAILED=0
+```
+
+Stop if `FAILED` is non-zero. For the 2026-07-16 delivery, the dry-run was reviewed and the corresponding command was then executed through a separate live-write approval:
+
+```bash
+railway run --service MongoDB sh -c \
+  'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/seedRailwayPhase9FOperationalData.js'
+```
+
+The first live run reported `CREATED=62 UPDATED=0 SKIPPED=0 FAILED=0`; the same-UTC-day rerun reported `CREATED=0 UPDATED=0 SKIPPED=62 FAILED=0`. A later-day rerun intentionally updates only the 50 owned relative-date records and skips the 12 stable district/feeder records.
+
+The operational seeder reads `users`, `territories`, `serviceareas`, `districts`, `feeders`, `transformers`, `inspections`, `faults`, and `maintenances`. It may write only the last six collections and only exact Phase 9F Railway keys (`P9FR-D*`, `P9FR-F*`, `P9FR-TX-*`, exact inspection/fault markers, and `P9FR-WO-*`). It does not write users, territories, service areas, QR codes, notifications, audit logs, sessions, refresh tokens, backups, imports, exports, or maintenance-mode records.
+
+There is no automatic rollback command. Any later live rollback requires a separately approved, read-only inventory and child-first removal of only the exact records confirmed as created by the live summary. Broad prefix deletion and collection-wide deletion are prohibited.
 
 ## 10. Demo Users
 
